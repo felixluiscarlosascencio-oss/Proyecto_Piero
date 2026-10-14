@@ -1,0 +1,115 @@
+:root {
+    --color-principal: #1d4ed8;
+    --color-oscuro: #0f172a;
+    --color-texto: #334155;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: var(--color-texto);
+    line-height: 1.6;
+}
+
+.contenedor { width: min(1100px, 92%); margin: 0 auto; }
+
+/* Cabecera */
+.cabecera { background: var(--color-oscuro); position: sticky; top: 0; z-index: 10; }
+.cabecera__interior { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; }
+.logo { color: #fff; text-decoration: none; font-size: 1.4rem; font-weight: 700; white-space: nowrap; }
+.logo span { color: #60a5fa; }
+.menu a { color: #cbd5e1; text-decoration: none; margin-left: 1.5rem; transition: color .2s; }
+.menu a:hover { color: #fff; }
+
+/* Hero */
+.hero {
+    background: linear-gradient(135deg, var(--color-oscuro), var(--color-principal));
+    color: #fff;
+    text-align: center;
+    padding: 6rem 0;
+}
+.hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); margin-bottom: 1rem; }
+.hero p { max-width: 600px; margin: 0 auto 2rem; font-size: 1.15rem; color: #e2e8f0; }
+
+/* Botón */
+.boton {
+    display: inline-block;
+    background: #fff;
+    color: var(--color-principal);
+    padding: .8rem 2rem;
+    border-radius: 999px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: transform .2s;
+}
+.boton:hover { transform: translateY(-2px); }
+
+/* Secciones */
+.seccion { padding: 4rem 0; text-align: center; }
+.seccion h2 { font-size: 2rem; margin-bottom: 2rem; color: var(--color-oscuro); }
+section[id] { scroll-margin-top: 80px; }
+
+/* Tarjetas */
+.tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; }
+.tarjeta {
+    background: #fff;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .1);
+}
+.tarjeta h3 { margin-bottom: .5rem; color: var(--color-principal); }
+.tarjeta p { text-wrap: balance; }
+
+/* Pie */
+.pie { background: var(--color-oscuro); color: #94a3b8; text-align: center; padding: 1.5rem 0; }
+
+/* Botón flotante de WhatsApp */
+.wsp-flotante {
+    position: fixed;
+    left: 20px;
+    bottom: 20px;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: #25d366;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .25);
+    z-index: 50;
+    transition: transform .2s, background .2s;
+}
+.wsp-flotante svg { width: 32px; height: 32px; fill: currentColor; }
+.wsp-flotante:hover { background: #1ebe5b; transform: scale(1.08); }
+
+.wsp-flotante::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: #25d366;
+    opacity: .5;
+    z-index: -1;
+    animation: wsp-pulso 2s ease-out infinite;
+}
+@keyframes wsp-pulso {
+    from { transform: scale(1); opacity: .5; }
+    to   { transform: scale(1.6); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .wsp-flotante::before { animation: none; }
+}
+
+/* Celulares */
+@media (max-width: 600px) {
+    .cabecera__interior { flex-direction: column; gap: .5rem; }
+    .logo { font-size: 1.25rem; }
+    .menu a { margin: 0 .75rem; font-size: .95rem; }
+    .hero { padding: 4rem 0; }
+    .wsp-flotante { width: 52px; height: 52px; left: 14px; bottom: 14px; }
+    .wsp-flotante svg { width: 28px; height: 28px; }
+}
