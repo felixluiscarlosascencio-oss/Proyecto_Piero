@@ -1,90 +1,244 @@
 :root {
-    --color-principal: #1d4ed8;
-    --color-oscuro: #0f172a;
-    --color-texto: #334155;
+    /* Paleta Corporativa Piero Producciones */
+    --color-oscuro: #111111;         /* Negro Carbón */
+    --color-principal: #1f1f1f;      /* Negro Suave para tarjetas/secciones */
+    --color-dorado: #D4AF37;         /* Dorado / Champagne para acentos */
+    --color-dorado-hover: #b8952b;   /* Dorado para estados hover */
+    --color-fondo: #f8f9fa;          /* Superficie blanca/gris suave */
+    --color-texto: #2d3748;          /* Gris oscuro legible */
+    --color-texto-mutado: #64748b;   /* Gris secundario */
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+/* Reset básico */
+* { 
+    margin: 0; 
+    padding: 0; 
+    box-sizing: border-box; 
+}
 
-html { scroll-behavior: smooth; }
+html { 
+    scroll-behavior: smooth; 
+}
 
 body {
-    font-family: "Segoe UI", Arial, sans-serif;
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
     color: var(--color-texto);
+    background-color: #ffffff;
     line-height: 1.6;
 }
 
-.contenedor { width: min(1100px, 92%); margin: 0 auto; }
-
-/* Cabecera */
-.cabecera { background: var(--color-oscuro); position: sticky; top: 0; z-index: 10; }
-.cabecera__interior { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; }
-.logo { color: #fff; text-decoration: none; font-size: 1.4rem; font-weight: 700; white-space: nowrap; }
-.logo span { color: #60a5fa; }
-.menu a { color: #cbd5e1; text-decoration: none; margin-left: 1.5rem; transition: color .2s; }
-.menu a:hover { color: #fff; }
-
-/* Hero */
-.hero {
-    background: linear-gradient(135deg, var(--color-oscuro), var(--color-principal));
-    color: #fff;
-    text-align: center;
-    padding: 6rem 0;
+.contenedor { 
+    width: min(1100px, 92%); 
+    margin: 0 auto; 
 }
-.hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); margin-bottom: 1rem; }
-.hero p { max-width: 600px; margin: 0 auto 2rem; font-size: 1.15rem; color: #e2e8f0; }
 
-/* Botón */
+/* ===================================
+   Cabecera Superior
+   =================================== */
+.cabecera { 
+    background: var(--color-oscuro); 
+    position: sticky; 
+    top: 0; 
+    z-index: 100; 
+    border-bottom: 1px solid rgba(212, 175, 55, 0.2); /* Sutil línea dorada */
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.cabecera__interior { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    padding: 1rem 0; 
+}
+
+.logo { 
+    color: #ffffff; 
+    text-decoration: none; 
+    font-size: 1.4rem; 
+    font-weight: 800; 
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    white-space: nowrap; 
+}
+
+.logo span { 
+    color: var(--color-dorado); 
+}
+
+.menu a { 
+    color: #e2e8f0; 
+    text-decoration: none; 
+    margin-left: 1.8rem; 
+    font-weight: 500;
+    transition: color 0.3s ease; 
+}
+
+.menu a:hover { 
+    color: var(--color-dorado); 
+}
+
+/* ===================================
+   Hero / Banner Principal (Llamativo pero elegante)
+   =================================== */
+.hero {
+    background: linear-gradient(180deg, rgba(17, 17, 17, 0.85) 0%, rgba(17, 17, 17, 0.95) 100%),
+                url('https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1200') center/cover no-repeat;
+    color: #ffffff;
+    text-align: center;
+    padding: 7rem 0 6rem;
+}
+
+.hero h1 { 
+    font-size: clamp(2.2rem, 5vw, 3.5rem); 
+    font-weight: 800;
+    margin-bottom: 1.2rem; 
+    line-height: 1.2;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+}
+
+.hero p { 
+    max-width: 650px; 
+    margin: 0 auto 2.5rem; 
+    font-size: 1.2rem; 
+    color: #cbd5e1; 
+    font-weight: 300;
+}
+
+/* ===================================
+   Botones Destacados
+   =================================== */
 .boton {
     display: inline-block;
-    background: #fff;
-    color: var(--color-principal);
-    padding: .8rem 2rem;
+    background: linear-gradient(135deg, var(--color-dorado), #f3e5ab);
+    color: var(--color-oscuro);
+    padding: 0.9rem 2.2rem;
     border-radius: 999px;
-    font-weight: 600;
+    font-weight: 700;
     text-decoration: none;
-    transition: transform .2s;
+    text-transform: uppercase;
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
+    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.3);
+    transition: all 0.3s ease;
 }
-.boton:hover { transform: translateY(-2px); }
 
-/* Secciones */
-.seccion { padding: 4rem 0; text-align: center; }
-.seccion h2 { font-size: 2rem; margin-bottom: 2rem; color: var(--color-oscuro); }
-section[id] { scroll-margin-top: 80px; }
+.boton:hover { 
+    transform: translateY(-3px); 
+    box-shadow: 0 10px 25px rgba(212, 175, 55, 0.45);
+    background: linear-gradient(135deg, #f3e5ab, var(--color-dorado));
+}
 
-/* Tarjetas */
-.tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; }
+/* ===================================
+   Secciones y Contenido
+   =================================== */
+.seccion { 
+    padding: 5rem 0; 
+    text-align: center; 
+}
+
+.seccion h2 { 
+    font-size: 2.2rem; 
+    margin-bottom: 2.5rem; 
+    color: var(--color-oscuro); 
+    font-weight: 800;
+    position: relative;
+    display: inline-block;
+}
+
+/* Subrayado decorativo dorado para títulos */
+.seccion h2::after {
+    content: "";
+    display: block;
+    width: 60%;
+    height: 3px;
+    background: var(--color-dorado);
+    margin: 0.5rem auto 0;
+    border-radius: 2px;
+}
+
+section[id] { 
+    scroll-margin-top: 80px; 
+}
+
+/* ===================================
+   Tarjetas de Servicios
+   =================================== */
+.tarjetas { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+    gap: 2rem; 
+}
+
 .tarjeta {
-    background: #fff;
-    padding: 2rem;
-    border-radius: 12px;
-    box-shadow: 0 4px 14px rgba(15, 23, 42, .1);
+    background: #ffffff;
+    padding: 2.5rem 2rem;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
 }
-.tarjeta h3 { margin-bottom: .5rem; color: var(--color-principal); }
-.tarjeta p { text-wrap: balance; }
 
-/* Pie */
-.pie { background: var(--color-oscuro); color: #94a3b8; text-align: center; padding: 1.5rem 0; }
+.tarjeta:hover {
+    transform: translateY(-5px);
+    border-color: var(--color-dorado);
+    box-shadow: 0 15px 35px rgba(212, 175, 55, 0.15);
+}
 
-/* Botón flotante de WhatsApp */
+.tarjeta h3 { 
+    margin-bottom: 0.8rem; 
+    color: var(--color-oscuro); 
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+.tarjeta p { 
+    color: var(--color-texto-mutado);
+    font-size: 0.98rem;
+    text-wrap: balance; 
+}
+
+/* ===================================
+   Pie de Página (Footer)
+   =================================== */
+.pie { 
+    background: var(--color-oscuro); 
+    color: #94a3b8; 
+    text-align: center; 
+    padding: 2rem 0; 
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.9rem;
+}
+
+/* ===================================
+   Botón Flotante de WhatsApp
+   =================================== */
 .wsp-flotante {
     position: fixed;
-    left: 20px;
-    bottom: 20px;
+    left: 24px;
+    bottom: 24px;
     width: 58px;
     height: 58px;
     border-radius: 50%;
     background: #25d366;
-    color: #fff;
+    color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, .25);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
     z-index: 50;
-    transition: transform .2s, background .2s;
+    transition: transform 0.3s ease, background 0.3s ease;
 }
-.wsp-flotante svg { width: 32px; height: 32px; fill: currentColor; }
-.wsp-flotante:hover { background: #1ebe5b; transform: scale(1.08); }
+
+.wsp-flotante svg { 
+    width: 32px; 
+    height: 32px; 
+    fill: currentColor; 
+}
+
+.wsp-flotante:hover { 
+    background: #1ebe5b; 
+    transform: scale(1.1); 
+}
 
 .wsp-flotante::before {
     content: "";
@@ -92,24 +246,51 @@ section[id] { scroll-margin-top: 80px; }
     inset: 0;
     border-radius: 50%;
     background: #25d366;
-    opacity: .5;
+    opacity: 0.5;
     z-index: -1;
     animation: wsp-pulso 2s ease-out infinite;
 }
+
 @keyframes wsp-pulso {
-    from { transform: scale(1); opacity: .5; }
+    from { transform: scale(1); opacity: 0.6; }
     to   { transform: scale(1.6); opacity: 0; }
 }
+
 @media (prefers-reduced-motion: reduce) {
     .wsp-flotante::before { animation: none; }
 }
 
-/* Celulares */
+/* ===================================
+   Responsive (Celulares)
+   =================================== */
 @media (max-width: 600px) {
-    .cabecera__interior { flex-direction: column; gap: .5rem; }
-    .logo { font-size: 1.25rem; }
-    .menu a { margin: 0 .75rem; font-size: .95rem; }
-    .hero { padding: 4rem 0; }
-    .wsp-flotante { width: 52px; height: 52px; left: 14px; bottom: 14px; }
-    .wsp-flotante svg { width: 28px; height: 28px; }
+    .cabecera__interior { 
+        flex-direction: column; 
+        gap: 0.8rem; 
+    }
+    
+    .logo { 
+        font-size: 1.25rem; 
+    }
+    
+    .menu a { 
+        margin: 0 0.6rem; 
+        font-size: 0.9rem; 
+    }
+    
+    .hero { 
+        padding: 5rem 0 4rem; 
+    }
+    
+    .wsp-flotante { 
+        width: 52px; 
+        height: 52px; 
+        left: 16px; 
+        bottom: 16px; 
+    }
+    
+    .wsp-flotante svg { 
+        width: 28px; 
+        height: 28px; 
+    }
 }

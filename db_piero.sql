@@ -241,5 +241,5 @@ CREATE TABLE pagos (
 -- ---------------------------------------------------------------------
 -- 6. USUARIO INICIAL (ADMIN)
 -- ---------------------------------------------------------------------
-INSERT INTO usuarios (usuario, password, rol, estado, creado_en)
-VALUES ('admin', 'admin1234', 'Admin', 1, NOW());
+//*INSERT INTO usuarios (usuario, password, rol, estado, creado_en)*/
+//*VALUES ('admin', 'admin1234', 'Admin', 1, NOW());*/
