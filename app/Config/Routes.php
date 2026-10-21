@@ -9,3 +9,10 @@ $routes->get('/', 'Home::index');
 $routes->get('login', 'AuthController::login');
 $routes->post('login', 'AuthController::processLogin');
 $routes->get('logout', 'AuthController::logout');
+
+// ==========================================
+// Rutas para el Módulo de Cotizaciones
+// ==========================================
+$routes->get('cotizaciones', 'CotizacionController::index');
+$routes->get('cotizaciones/crear', 'CotizacionController::crear');
+$routes->post('cotizaciones/guardar', 'CotizacionController::guardar');
