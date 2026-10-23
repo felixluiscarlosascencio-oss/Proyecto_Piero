@@ -10,7 +10,15 @@
     <div class="contenedor">
         <h1>Fotos y videos escolares</h1>
         <p>Capturamos cada etapa de tus estudiantes: promociones, actuaciones y recuerdos que duran toda la vida.</p>
-        <a class="boton" href="<?= enlace_wsp() ?>" target="_blank" rel="noopener">Solicitar información</a>
+        
+        <!-- Contenedor con los dos botones -->
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 20px;">
+            <!-- Botón de WhatsApp (Intacto) -->
+            <a class="boton" href="<?= enlace_wsp() ?>" target="_blank" rel="noopener">Solicitar información</a>
+            
+            <!-- Nuevo botón para ir directo al Cotizador -->
+            <a class="boton" href="<?= base_url('cotizaciones/crear') ?>" style="background: #d4af37; color: #000; font-weight: bold;">Crear Cotización</a>
+        </div>
     </div>
 </section>
 
