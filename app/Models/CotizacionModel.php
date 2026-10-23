@@ -14,17 +14,18 @@ class CotizacionModel extends Model
     protected $protectFields    = true;
     
     protected $allowedFields    = [
-        'cliente_id', 
-        'codigo_cotizacion', 
-        'fecha_emision', 
-        'monto_total', 
-        'estado', 
-        'observaciones', 
-        'created_at', 
-        'updated_at'
+        'nombre_colegio',
+        'grado',
+        'seccion',
+        'cantidad_alumnos',
+        'sesiones',
+        'modelo_cuadro',
+        'servicios_json',
+        'precio_unitario',
+        'total_seccion',
+        'fecha_creacion'
     ];
 
-    protected $useTimestamps = true;
-    protected $createdField  = 'created_at';
-    protected $updatedField  = 'updated_at';
+    // Dates
+    protected $useTimestamps = false;
 }

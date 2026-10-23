@@ -67,3 +67,21 @@ Additionally, make sure that the following extensions are enabled in your PHP:
 - json (enabled by default - don't turn it off)
 - [mysqlnd](http://php.net/manual/en/mysqlnd.install.php) if you plan to use MySQL
 - [libcurl](http://php.net/manual/en/curl.requirements.php) if you plan to use the HTTP\CURLRequest library
+
+
+.env
+CI_ENVIRONMENT = development
+
+app.baseURL = 'http://localhost:8080/'
+
+database.default.hostname = localhost
+database.default.database = database.db
+database.default.username = 
+database.default.password = 
+database.default.DBDriver = SQLite3
+database.default.DBPrefix = 
+database.default.pConnect = false
+database.default.DBDebug = true
+database.default.charset = utf8
+database.default.DBCollat = utf8_general_ci
+database.default.port = 3306
