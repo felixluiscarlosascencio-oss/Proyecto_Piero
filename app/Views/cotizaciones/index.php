@@ -11,14 +11,19 @@
 <body>
 
 <div class="cotizador-container">
-    <div class="header-cotizacion">
+    <div class="header-cotizacion" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
         <div>
             <span class="badge-top"><i class="fa-solid fa-list"></i> MÓDULO DE PRUEBAS</span>
             <h1 style="font-size: 26px; margin-top: 8px;">Cotizaciones Registradas</h1>
         </div>
-        <a href="<?= base_url('cotizaciones/crear') ?>" class="btn-gold" style="display: inline-block; text-align: center; text-decoration: none; width: auto; padding: 10px 20px;">
-            <i class="fa-solid fa-plus"></i> Nueva Cotización
-        </a>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <a href="<?= base_url('/') ?>" style="display: inline-flex; align-items: center; gap: 8px; background: #1a1a1a; border: 1px solid #333; color: #aaa; padding: 12px 18px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 500; line-height: 1; box-sizing: border-box;">
+                <i class="fa-solid fa-arrow-left"></i> Volver al Inicio
+            </a>
+            <a href="<?= base_url('cotizaciones/crear') ?>" class="btn-gold" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; width: auto; padding: 12px 20px; margin: 0; line-height: 1; box-sizing: border-box;">
+                <i class="fa-solid fa-plus"></i> Nueva Cotización
+            </a>
+        </div>
     </div>
 
     <?php if (session()->has('mensaje')): ?>

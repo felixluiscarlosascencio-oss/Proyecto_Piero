@@ -14,6 +14,7 @@
             <nav class="menu">
                 <a href="<?= base_url() ?>">Inicio</a>
                 <a href="<?= base_url('#servicios') ?>">Servicios</a>
+                <a href="<?= base_url('cotizaciones') ?>" style="color: #d4af37; font-weight: 600;">Cotizaciones</a>
             </nav>
         </div>
     </header>

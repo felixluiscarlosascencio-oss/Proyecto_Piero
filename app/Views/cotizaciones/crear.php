@@ -15,14 +15,19 @@
 
 <div class="cotizador-container">
     
-    <div class="header-cotizacion">
+    <div class="header-cotizacion" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
         <div>
             <span class="badge-top"><i class="fa-solid fa-calculator"></i> NUEVA COTIZACIÓN</span>
             <h1 style="font-size: 26px; margin-top: 8px;">Armar Cotización Escolar</h1>
             <p style="font-size: 13px; color: #888;">Ingresa los datos del colegio y selecciona los requerimientos de la promoción.</p>
         </div>
-        <div style="font-size: 13px; color: #d4af37; font-weight: 600;">
-            Piero Producciones
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <a href="<?= base_url('cotizaciones') ?>" style="background: #1a1a1a; border: 1px solid #333; color: #aaa; padding: 10px 16px; border-radius: 8px; text-decoration: none; font-size: 13px;">
+                <i class="fa-solid fa-list"></i> Ver Listado
+            </a>
+            <a href="<?= base_url('/') ?>" style="background: #1a1a1a; border: 1px solid #333; color: #aaa; padding: 10px 16px; border-radius: 8px; text-decoration: none; font-size: 13px;">
+                <i class="fa-solid fa-arrow-left"></i> Volver al Inicio
+            </a>
         </div>
     </div>
 
