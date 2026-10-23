@@ -3,40 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iniciar Sesión | PIERO PRODUCCIONES</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Tu CSS separado desde la carpeta public/css/login.css -->
+    <title>Iniciar Sesión | Piero Producciones</title>
+
+    <!-- Fuentes e Íconos -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Estilos del Login -->
     <link rel="stylesheet" href="<?= base_url('css/login.css') ?>">
 </head>
 <body>
 
-<div class="card-login">
-    <h3 class="text-center mb-1 fw-bold">PIERO PRODUCCIONES</h3>
-    <p class="text-center text-muted mb-4">Ingresa tus credenciales para acceder</p>
-
-    <!-- Alerta de error en caso de credenciales incorrectas -->
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="alert alert-danger p-2 small text-center">
-            <?= session()->getFlashdata('error') ?>
+<div class="login-wrapper">
+    
+    <!-- PANEL IZQUIERDO: MARCA E IMAGEN -->
+    <div class="login-hero">
+        <div class="hero-content">
+            <div class="brand-logo-text">
+                PIERO <span>PRODUCCIONES</span>
+            </div>
         </div>
-    <?php endif; ?>
-
-    <form action="<?= base_url('login') ?>" method="POST">
-        <?= csrf_field() ?>
         
-        <div class="mb-3">
-            <label for="username" class="form-label">Usuario</label>
-            <input type="text" name="username" id="username" class="form-control" placeholder="Ej: admin" required autofocus>
+        <div class="hero-content hero-text">
+            <h2>Capturando momentos únicos que perduran</h2>
+            <p>Sistema de gestión interna para cotizaciones, sesiones fotográficas y proyectos escolares de Piero Producciones.</p>
         </div>
 
-        <div class="mb-4">
-            <label for="password" class="form-label">Contraseña</label>
-            <input type="password" name="password" id="password" class="form-control" placeholder="••••••••" required>
+        <div class="hero-content hero-copy">
+            &copy; <?= date('Y') ?> Piero Producciones. Todos los derechos reservados.
+        </div>
+    </div>
+
+    <!-- PANEL DERECHO: FORMULARIO -->
+    <div class="login-form-container">
+        
+        <a href="<?= base_url('/') ?>" class="back-home">
+            <i class="fa-solid fa-arrow-left"></i> Ir a la web
+        </a>
+
+        <div class="form-box">
+            
+            <div class="form-header">
+                <h3>Iniciar Sesión</h3>
+                <p>Ingresa tus credenciales para acceder al panel</p>
+            </div>
+
+            <?php if (session()->getFlashdata('error')): ?>
+                <div class="alert-error">
+                    <i class="fa-solid fa-circle-exclamation"></i> <?= session()->getFlashdata('error') ?>
+                </div>
+            <?php endif; ?>
+
+            <form action="<?= base_url('login') ?>" method="POST">
+                <?= csrf_field() ?>
+                
+                <div class="input-group-custom">
+                    <label for="username">Usuario</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-user"></i>
+                        <input type="text" id="username" name="username" class="input-control" placeholder="Ej. admin" required autofocus>
+                    </div>
+                </div>
+
+                <div class="input-group-custom">
+                    <label for="password">Contraseña</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-lock"></i>
+                        <input type="password" id="password" name="password" class="input-control" placeholder="••••••••" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit">
+                    Ingresar al Sistema <i class="fa-solid fa-arrow-right"></i>
+                </button>
+
+            </form>
         </div>
 
-        <button type="submit" class="btn btn-gold w-100 py-2">Ingresar al Sistema</button>
-    </form>
+    </div>
+
 </div>
 
 </body>

@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Controllers\BaseController;
+use Config\Database;
 
 class AuthController extends BaseController
 {
@@ -14,11 +15,10 @@ class AuthController extends BaseController
     public function processLogin()
     {
         $session = session();
-        $db = \Config\Database::connect();
-        $request = \Config\Services::request();
+        $db = Database::connect();
 
-        $username = $request->getPost('username');
-        $password = $request->getPost('password');
+        $username = $this->request->getPost('username');
+        $password = $this->request->getPost('password');
 
         // Busca en la tabla 'usuarios' por el campo 'usuario'
         $user = $db->table('usuarios')->where('usuario', $username)->get()->getRowArray();
@@ -37,12 +37,14 @@ class AuthController extends BaseController
                     'ultimo_acceso' => date('Y-m-d H:i:s')
                 ]);
 
-                // Guardar datos clave en la sesión
+                // Guardar datos clave en la sesión (compatibles con main.php)
                 $sessionData = [
                     'id_usuario' => $user['id'],
                     'usuario'    => $user['usuario'],
+                    'username'   => $user['usuario'],  // Se agrega 'username' para la vista main.php
                     'rol'        => $user['rol'],
                     'isLoggedIn' => true,
+                    'logged_in'  => true               // Se agrega 'logged_in' para la vista main.php
                 ];
                 $session->set($sessionData);
 
