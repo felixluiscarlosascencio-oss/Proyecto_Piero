@@ -3,12 +3,14 @@
 /**
  * DATOS DE WHATSAPP (edita solo estas dos líneas)
  */
-function enlace_wsp(): string
+function numero_wsp(): string
 {
-    $numero  = '51926650680'; // 51 + 9 dígitos, sin + ni espacios
-    $mensaje = 'Hola, quisiera cotizar fotos y videos para mi institución';
+    return '51926650680';
+}
 
-    return 'https://wa.me/' . $numero . '?text=' . rawurlencode($mensaje);
+function enlace_wsp(string $mensaje): string
+{
+    return 'https://wa.me/' . numero_wsp() . '?text=' . rawurlencode($mensaje);
 }
 
 function icono_wsp(): string

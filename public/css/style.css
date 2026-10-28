@@ -197,6 +197,32 @@ section[id] {
     text-wrap: balance; 
 }
 
+.solicitud-form {
+    background: #f8f9fa;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    margin: 0 auto;
+    max-width: 700px;
+    padding: 2rem;
+    text-align: left;
+}
+
+.solicitud-form .form-group { margin-bottom: 1.25rem; }
+.solicitud-form label, .solicitud-form legend { font-weight: 600; }
+.solicitud-form input[type="text"], .solicitud-form input[type="number"] {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    display: block;
+    font: inherit;
+    margin-top: 0.4rem;
+    padding: 0.75rem;
+    width: 100%;
+}
+.solicitud-form fieldset { border: 0; margin: 1rem 0 1.5rem; }
+.solicitud-form fieldset label { display: block; font-weight: 400; margin: 0.5rem 0; }
+.solicitud-form fieldset input { margin-right: 0.5rem; }
+.solicitud-form #solicitud-mensaje { margin: 1rem 0 0; }
+
 /* ===================================
    Pie de Página (Footer)
    =================================== */

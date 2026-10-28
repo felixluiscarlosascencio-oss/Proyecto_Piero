@@ -13,9 +13,9 @@ class CotizacionExtraModel extends Model
     protected $protectFields    = true;
 
     protected $allowedFields    = [
-        'cotizacion_id', 
-        'descripcion', 
-        'monto'
+        'cotizacion_id',
+        'descripcion',
+        'monto',
     ];
 
     protected $useTimestamps = false;

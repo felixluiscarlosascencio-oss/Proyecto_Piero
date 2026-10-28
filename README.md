@@ -1,75 +1,43 @@
-# CodeIgniter 4 Application Starter
+# Piero Producciones
 
-## What is CodeIgniter?
+Aplicación de gestión para cotizaciones escolares, construida con PHP 8.4 y
+CodeIgniter 4.7.5.
 
-CodeIgniter is a PHP full-stack web framework that is light, fast, flexible and secure.
-More information can be found at the [official site](https://codeigniter.com).
+## Requisitos
 
-This repository holds a composer-installable app starter.
-It has been built from the
-[development repository](https://github.com/codeigniter4/CodeIgniter4).
+- PHP 8.4 con las extensiones requeridas por CodeIgniter, Dompdf y la base de
+  datos configurada.
+- Composer.
+- Base de datos configurada en `.env`.
 
-More information about the plans for version 4 can be found in [CodeIgniter 4](https://forum.codeigniter.com/forumdisplay.php?fid=28) on the forums.
+## Instalación
 
-You can read the [user guide](https://codeigniter.com/user_guide/)
-corresponding to the latest version of the framework.
+```sh
+composer install
+php spark migrate
+```
 
-## Installation & updates
+Configura `app.baseURL` y las credenciales de base de datos en `.env`. El
+servidor web debe apuntar a `public/`.
 
-`composer create-project codeigniter4/appstarter` then `composer update` whenever
-there is a new release of the framework.
+## Cotizaciones
 
-When updating, check the release notes to see if there are any changes you might need to apply
-to your `app` folder. The affected files can be copied or merged from
-`vendor/codeigniter4/framework/app`.
+El cotizador público persiste cada solicitud en `solicitudes_cotizacion` y
+prepara un mensaje estructurado de WhatsApp para que el cliente lo envíe al
+número comercial configurado en `app/Helpers/contacto_helper.php`.
 
-## Setup
+El panel requiere autenticación y está disponible en `/admin/cotizaciones`.
+Los estados de cada cotización son:
 
-Copy `env` to `.env` and tailor for your app, specifically the baseURL
-and any database settings.
+1. `solicitud`: recibida y pendiente de revisión.
+2. `aprobada_admin`: precios revisados y aprobados; habilita el PDF.
+3. `pendiente`: PDF generado y cotización vigente para el cliente.
+4. `aprobado`: confirmada por el cliente; permite coordinar producción.
 
-## Important Change with index.php
+La vigencia se indica al generar el PDF. La estructura de la tabla de este flujo
+se gestiona exclusivamente mediante la migración de CodeIgniter.
 
-`index.php` is no longer in the root of the project! It has been moved inside the *public* folder,
-for better security and separation of components.
-
-This means that you should configure your web server to "point" to your project's *public* folder, and
-not to the project root. A better practice would be to configure a virtual host to point there. A poor practice would be to point your web server to the project root and expect to enter *public/...*, as the rest of your logic and the
-framework are exposed.
-
-**Please** read the user guide for a better explanation of how CI4 works!
-
-## Repository Management
-
-We use GitHub issues, in our main repository, to track **BUGS** and to track approved **DEVELOPMENT** work packages.
-We use our [forum](http://forum.codeigniter.com) to provide SUPPORT and to discuss
-FEATURE REQUESTS.
-
-This repository is a "distribution" one, built by our release preparation script.
-Problems with it can be raised on our forum, or as issues in the main repository.
-
-## Server Requirements
-
-PHP version 8.2 or higher is required, with the following extensions installed:
-
-- [intl](http://php.net/manual/en/intl.requirements.php)
-- [mbstring](http://php.net/manual/en/mbstring.installation.php)
-
-> [!WARNING]
-> - The end of life date for PHP 7.4 was November 28, 2022.
-> - The end of life date for PHP 8.0 was November 26, 2023.
-> - The end of life date for PHP 8.1 was December 31, 2025.
-> - If you are still using below PHP 8.2, you should upgrade immediately.
-> - The end of life date for PHP 8.2 will be December 31, 2026.
-
-Additionally, make sure that the following extensions are enabled in your PHP:
-
-- json (enabled by default - don't turn it off)
-- [mysqlnd](http://php.net/manual/en/mysqlnd.install.php) if you plan to use MySQL
-- [libcurl](http://php.net/manual/en/curl.requirements.php) if you plan to use the HTTP\CURLRequest library
-
-
-.env
+ARCHIVO .env
 CI_ENVIRONMENT = development
 
 app.baseURL = 'http://localhost:8080/'

@@ -2,140 +2,200 @@
 
 namespace App\Controllers;
 
+use App\Models\CotizacionModel;
+use Dompdf\Dompdf;
+use Dompdf\Options;
+
 class CotizacionController extends BaseController
 {
-    /**
-     * Muestra el listado de todas las cotizaciones guardadas en sesión.
-     */
-    public function index()
+    public function index(): string
     {
-        $session = session();
-        $data['cotizaciones'] = $session->get('cotizaciones_temp') ?? [];
-        return view('cotizaciones/index', $data);
+        $model = new CotizacionModel();
+
+        return view('admin/cotizaciones/index', [
+            'cotizaciones' => $model->orderBy('created_at', 'DESC')->findAll(),
+        ]);
     }
 
-    /**
-     * Carga la vista del formulario interactivo para armar una nueva cotización.
-     */
-    public function crear()
+    public function editar(int $id)
     {
-        return view('cotizaciones/crear');
+        $cotizacion = (new CotizacionModel())->find($id);
+
+        if ($cotizacion === null) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se encontró la solicitud.');
+        }
+
+        if (! in_array($cotizacion['estado'], [
+            CotizacionModel::ESTADO_SOLICITUD,
+            CotizacionModel::ESTADO_APROBADA_ADMIN,
+        ], true)) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Esta cotización ya no se puede modificar.');
+        }
+
+        $cotizacion['servicios'] = json_decode($cotizacion['servicios_json'], true, 512, JSON_THROW_ON_ERROR);
+
+        return view('admin/cotizaciones/editar', ['cotizacion' => $cotizacion]);
     }
 
-    /**
-     * Recibe los datos por POST, calcula totales y los AGREGA a la lista en sesión.
-     */
-    public function guardar()
+    public function actualizar(int $id)
     {
-        $serviciosSeleccionados = $this->request->getPost('servicios') ?? [];
-        $cantidadAlumnos = (int) $this->request->getPost('cantidad_alumnos');
+        $model = new CotizacionModel();
+        $cotizacion = $model->find($id);
 
-        $precioUnitario = 0;
-        foreach ($serviciosSeleccionados as $precio) {
-            $precioUnitario += (float) $precio;
+        if ($cotizacion === null || ! in_array($cotizacion['estado'], [
+            CotizacionModel::ESTADO_SOLICITUD,
+            CotizacionModel::ESTADO_APROBADA_ADMIN,
+        ], true)) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se puede actualizar esta cotización.');
         }
 
-        $totalSeccion = $precioUnitario * $cantidadAlumnos;
+        $cantidad = filter_var($this->request->getPost('cantidad_estudiantes'), FILTER_VALIDATE_INT);
+        $servicios = $this->request->getPost('servicios');
 
-        // Generamos un ID único temporal basado en el tiempo
-        $idTemp = time();
+        if ($cantidad === false || $cantidad < 1 || $cantidad > 10000 || ! is_array($servicios)) {
+            return redirect()->back()->withInput()->with('error', 'Ingresa una cantidad válida y al menos un servicio.');
+        }
 
-        $dataCotizacion = [
-            'id'               => $idTemp,
-            'nombre_colegio'   => $this->request->getPost('nombre_colegio'),
-            'grado'            => $this->request->getPost('grado'),
-            'seccion'          => $this->request->getPost('seccion'),
-            'cantidad_alumnos' => $cantidadAlumnos,
-            'sesiones'         => $this->request->getPost('sesiones'),
-            'modelo_cuadro'    => $this->request->getPost('modelo_cuadro'),
-            'servicios'        => $serviciosSeleccionados,
-            'precio_unitario'  => $precioUnitario,
-            'total_seccion'    => $totalSeccion,
-            'fecha_creacion'   => date('Y-m-d H:i:s')
-        ];
+        $serviciosNormalizados = [];
+        foreach ($servicios as $servicio) {
+            if (! is_array($servicio)) {
+                continue;
+            }
 
-        $session = session();
-        $cotizaciones = $session->get('cotizaciones_temp') ?? [];
-        
-        // Agregamos la nueva cotización al arreglo
-        invocation: 
-        $cotizaciones[$idTemp] = $dataCotizacion;
-        $session->set('cotizaciones_temp', $cotizaciones);
+            $nombre = $servicio['nombre'] ?? null;
+            $precio = $servicio['precio_unitario'] ?? null;
 
-        return redirect()->to(base_url('cotizaciones'))->with('mensaje', '¡Cotización guardada en la lista de prueba!');
+            if ($nombre === null && ($precio === null || $precio === '')) {
+                continue;
+            }
+
+            if (
+                ! is_string($nombre)
+                || trim($nombre) === ''
+                || mb_strlen(trim($nombre)) > 120
+                || ! is_numeric($precio)
+                || (float) $precio < 0
+                || (float) $precio > 9999999999.99
+            ) {
+                return redirect()->back()->withInput()->with('error', 'Revisa el nombre y el precio de cada servicio.');
+            }
+
+            $serviciosNormalizados[] = [
+                'nombre'          => trim($nombre),
+                'precio_unitario' => round((float) $precio, 2),
+            ];
+        }
+
+        if ($serviciosNormalizados === []) {
+            return redirect()->back()->withInput()->with('error', 'La cotización debe incluir al menos un servicio con precio.');
+        }
+
+        $precioUnitario = array_sum(array_column($serviciosNormalizados, 'precio_unitario'));
+        if ($precioUnitario > 9999999999.99) {
+            return redirect()->back()->withInput()->with('error', 'El total por estudiante supera el máximo permitido.');
+        }
+
+        if (! $model->update($id, [
+            'cantidad_estudiantes' => $cantidad,
+            'servicios_json'       => json_encode($serviciosNormalizados, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+            'precio_unitario'      => $precioUnitario,
+            'total_seccion'        => round($precioUnitario * $cantidad, 2),
+        ])) {
+            log_message('error', 'Failed to update quote #' . $id . ': ' . json_encode($model->errors()));
+
+            return redirect()->back()->withInput()->with('error', 'No se pudo actualizar la cotización.');
+        }
+
+        return redirect()->to(base_url('admin/cotizaciones/' . $id))->with('mensaje', 'Cotización actualizada.');
     }
 
-    /**
-     * Carga una cotización específica para editarla.
-     */
-    public function editar($id = null)
+    public function aprobar(int $id)
     {
-        $session = session();
-        $cotizaciones = $session->get('cotizaciones_temp') ?? [];
+        $model = new CotizacionModel();
+        $cotizacion = $model->find($id);
 
-        if (!isset($cotizaciones[$id])) {
-            return redirect()->to(base_url('cotizaciones'))->with('error', 'Cotización no encontrada.');
+        if ($cotizacion === null || $cotizacion['estado'] !== CotizacionModel::ESTADO_SOLICITUD) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo se pueden aprobar solicitudes pendientes de revisión.');
         }
 
-        $data['cotizacion'] = $cotizaciones[$id];
-        return view('cotizaciones/editar', $data);
+        if ((float) $cotizacion['total_seccion'] <= 0) {
+            return redirect()->to(base_url('admin/cotizaciones/' . $id))->with('error', 'Define los precios antes de aprobar la cotización.');
+        }
+
+        if (! $model->update($id, [
+            'estado'       => CotizacionModel::ESTADO_APROBADA_ADMIN,
+            'aprobado_por' => session()->get('id_usuario'),
+        ])) {
+            log_message('error', 'Failed to approve quote #' . $id . ': ' . json_encode($model->errors()));
+
+            return redirect()->to(base_url('admin/cotizaciones/' . $id))->with('error', 'No se pudo aprobar la cotización.');
+        }
+
+        return redirect()->to(base_url('admin/cotizaciones/' . $id))->with('mensaje', 'Cotización aprobada. Ya se puede generar el PDF.');
     }
 
-    /**
-     * Actualiza los datos de una cotización existente en la sesión.
-     */
-    public function actualizar($id = null)
+    public function descargarPdf(int $id)
     {
-        $session = session();
-        $cotizaciones = $session->get('cotizaciones_temp') ?? [];
+        $model = new CotizacionModel();
+        $cotizacion = $model->find($id);
 
-        if (!isset($cotizaciones[$id])) {
-            return redirect()->to(base_url('cotizaciones'))->with('error', 'Cotización no encontrada.');
+        if ($cotizacion === null || $cotizacion['estado'] !== CotizacionModel::ESTADO_APROBADA_ADMIN) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'La cotización debe estar aprobada por el administrador antes de generar el PDF.');
         }
 
-        $serviciosSeleccionados = $this->request->getPost('servicios') ?? [];
-        $cantidadAlumnos = (int) $this->request->getPost('cantidad_alumnos');
-
-        $precioUnitario = 0;
-        foreach ($serviciosSeleccionados as $precio) {
-            $precioUnitario += (float) $precio;
+        $diasVigencia = filter_var($this->request->getPost('dias_vigencia'), FILTER_VALIDATE_INT);
+        if ($diasVigencia === false || $diasVigencia < 1 || $diasVigencia > 365) {
+            return redirect()->back()->withInput()->with('error', 'La vigencia debe ser de 1 a 365 días.');
         }
 
-        $totalSeccion = $precioUnitario * $cantidadAlumnos;
+        $cotizacion['servicios'] = json_decode($cotizacion['servicios_json'], true, 512, JSON_THROW_ON_ERROR);
+        $cotizacion['dias_vigencia'] = $diasVigencia;
+        $cotizacion['vence_en'] = date('Y-m-d', strtotime('+' . $diasVigencia . ' days'));
 
-        // Actualizamos los datos manteniendo el mismo ID
-        $cotizaciones[$id] = [
-            'id'               => $id,
-            'nombre_colegio'   => $this->request->getPost('nombre_colegio'),
-            'grado'            => $this->request->getPost('grado'),
-            'seccion'          => $this->request->getPost('seccion'),
-            'cantidad_alumnos' => $cantidadAlumnos,
-            'sesiones'         => $this->request->getPost('sesiones'),
-            'modelo_cuadro'    => $this->request->getPost('modelo_cuadro'),
-            'servicios'        => $serviciosSeleccionados,
-            'precio_unitario'  => $precioUnitario,
-            'total_seccion'    => $totalSeccion,
-            'fecha_creacion'   => $cotizaciones[$id]['fecha_creacion']
-        ];
+        $options = new Options();
+        $options->set('isRemoteEnabled', false);
+        $pdf = new Dompdf($options);
+        $pdf->loadHtml(view('admin/cotizaciones/pdf', ['cotizacion' => $cotizacion]), 'UTF-8');
+        $pdf->setPaper('A4', 'portrait');
+        $pdf->render();
+        $contenidoPdf = $pdf->output();
 
-        $session->set('cotizaciones_temp', $cotizaciones);
+        if (! $model->update($id, [
+            'estado'         => CotizacionModel::ESTADO_PENDIENTE,
+            'dias_vigencia'  => $diasVigencia,
+            'vence_en'       => $cotizacion['vence_en'] . ' 23:59:59',
+            'pdf_generado_en' => date('Y-m-d H:i:s'),
+        ])) {
+            log_message('error', 'Failed to mark generated PDF for quote #' . $id . ': ' . json_encode($model->errors()));
 
-        return redirect()->to(base_url('cotizaciones'))->with('mensaje', 'Cotización actualizada correctamente.');
+            return redirect()->to(base_url('admin/cotizaciones/' . $id))->with('error', 'No se pudo guardar la vigencia y el estado del PDF.');
+        }
+
+        return $this->response
+            ->setHeader('Content-Type', 'application/pdf')
+            ->setHeader('Content-Disposition', 'attachment; filename="cotizacion-' . $id . '.pdf"')
+            ->setBody($contenidoPdf);
     }
 
-    /**
-     * Elimina una cotización específica de la lista en sesión.
-     */
-    public function eliminar($id = null)
+    public function confirmar(int $id)
     {
-        $session = session();
-        $cotizaciones = $session->get('cotizaciones_temp') ?? [];
+        $model = new CotizacionModel();
+        $cotizacion = $model->find($id);
 
-        if (isset($cotizaciones[$id])) {
-            unset($cotizaciones[$id]);
-            $session->set('cotizaciones_temp', $cotizaciones);
+        if (
+            $cotizacion === null
+            || $cotizacion['estado'] !== CotizacionModel::ESTADO_PENDIENTE
+            || ($cotizacion['vence_en'] !== null && strtotime($cotizacion['vence_en']) < time())
+        ) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo se puede confirmar una cotización pendiente.');
         }
 
-        return redirect()->to(base_url('cotizaciones'))->with('mensaje', 'Cotización eliminada de la lista.');
+        if (! $model->update($id, ['estado' => CotizacionModel::ESTADO_APROBADO])) {
+            log_message('error', 'Failed to confirm quote #' . $id . ': ' . json_encode($model->errors()));
+
+            return redirect()->to(base_url('admin/cotizaciones/' . $id))->with('error', 'No se pudo confirmar la cotización.');
+        }
+
+        return redirect()->to(base_url('admin/cotizaciones/' . $id))->with('mensaje', 'Cotización marcada como aprobada por el cliente. Ya puede coordinarse la producción.');
     }
 }

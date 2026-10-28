@@ -18,17 +18,16 @@
             <nav class="menu" style="display: flex; align-items: center; gap: 20px;">
                 <a href="<?= base_url() ?>">Inicio</a>
                 <a href="<?= base_url('#servicios') ?>">Servicios</a>
-                <a href="<?= base_url('cotizaciones') ?>" style="color: #d4af37; font-weight: 600;">Cotizaciones</a>
-
-                <!-- ESTADO DE SESIÓN DE USUARIO -->
                 <?php if (session()->get('logged_in')): ?>
                     <div style="display: flex; align-items: center; gap: 12px; margin-left: 10px; padding-left: 15px; border-left: 1px solid #333;">
+                        <a href="<?= base_url('admin/cotizaciones') ?>">Administración</a>
                         <span style="color: #d4af37; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
                             <i class="fa-solid fa-user-gear"></i> <?= esc(session()->get('username') ?? 'admin') ?>
                         </span>
-                        <a href="<?= base_url('logout') ?>" style="background: rgba(235, 87, 87, 0.15); border: 1px solid #eb5757; color: #ff6b6b; padding: 5px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; transition: all 0.2s ease;">
-                            <i class="fa-solid fa-right-from-bracket"></i> Salir
-                        </a>
+                        <form action="<?= base_url('logout') ?>" method="post">
+                            <?= csrf_field() ?>
+                            <button type="submit" style="background: rgba(235, 87, 87, 0.15); border: 1px solid #eb5757; color: #ff6b6b; padding: 5px 12px; border-radius: 6px; cursor: pointer;">Salir</button>
+                        </form>
                     </div>
                 <?php else: ?>
                     <a href="<?= base_url('login') ?>" style="background: linear-gradient(135deg, #e5be3e 0%, #c49a22 100%); color: #0b0c0e; padding: 6px 14px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 700; margin-left: 10px;">
@@ -49,7 +48,7 @@
         </div>
     </footer>
 
-    <a class="wsp-flotante" href="<?= enlace_wsp() ?>" target="_blank" rel="noopener" aria-label="Escribir por WhatsApp" title="Escríbenos por WhatsApp">
+    <a class="wsp-flotante" href="<?= base_url('#cotizador') ?>" aria-label="Solicitar cotización" title="Solicitar cotización">
         <?= icono_wsp() ?>
     </a>
 </body>

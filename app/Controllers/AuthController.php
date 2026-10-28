@@ -9,7 +9,11 @@ class AuthController extends BaseController
 {
     public function login()
     {
-        return view('login');
+        if (session()->get('logged_in')) {
+            return redirect()->to(base_url('admin/cotizaciones'));
+        }
+
+        return view('admin/login');
     }
 
     public function processLogin()
@@ -31,6 +35,7 @@ class AuthController extends BaseController
 
             // Compara la contraseña ingresada con el hash encriptado
             if (password_verify($password, $user['password_hash'])) {
+                $session->regenerate(true);
                 
                 // Actualizar ultimo_acceso
                 $db->table('usuarios')->where('id', $user['id'])->update([
@@ -49,7 +54,7 @@ class AuthController extends BaseController
                 $session->set($sessionData);
 
                 // Redirige a la página principal
-                return redirect()->to('/');
+                return redirect()->to(base_url('admin/cotizaciones'));
             }
         }
 

@@ -6,7 +6,12 @@ use CodeIgniter\Model;
 
 class CotizacionModel extends Model
 {
-    protected $table            = 'cotizaciones';
+    public const ESTADO_SOLICITUD = 'solicitud';
+    public const ESTADO_APROBADA_ADMIN = 'aprobada_admin';
+    public const ESTADO_PENDIENTE = 'pendiente';
+    public const ESTADO_APROBADO = 'aprobado';
+
+    protected $table            = 'solicitudes_cotizacion';
     protected $primaryKey       = 'id';
     protected $useAutoIncrement = true;
     protected $returnType       = 'array';
@@ -15,17 +20,18 @@ class CotizacionModel extends Model
     
     protected $allowedFields    = [
         'nombre_colegio',
-        'grado',
-        'seccion',
-        'cantidad_alumnos',
-        'sesiones',
-        'modelo_cuadro',
+        'cantidad_estudiantes',
         'servicios_json',
         'precio_unitario',
         'total_seccion',
-        'fecha_creacion'
+        'estado',
+        'dias_vigencia',
+        'vence_en',
+        'aprobado_por',
+        'pdf_generado_en',
     ];
 
-    // Dates
-    protected $useTimestamps = false;
+    protected $useTimestamps = true;
+    protected $createdField  = 'created_at';
+    protected $updatedField  = 'updated_at';
 }
