@@ -12,9 +12,25 @@ $routes->post('cotizaciones/solicitar', 'SolicitudCotizacionController::crear');
 
 $routes->group('admin', ['filter' => 'auth'], static function ($routes): void {
     $routes->get('cotizaciones', 'CotizacionController::index');
-    $routes->get('cotizaciones/(:num)', 'CotizacionController::editar/$1');
+    $routes->get('cotizaciones/vigentes', 'CotizacionController::vigentes');
+    $routes->get('cotizaciones/(:num)/editar', 'CotizacionController::editar/$1');
+    $routes->get('cotizaciones/(:num)/ver', 'CotizacionController::ver/$1');
+    $routes->get('cotizaciones/(:num)', 'CotizacionController::ver/$1');
     $routes->post('cotizaciones/(:num)', 'CotizacionController::actualizar/$1');
-    $routes->post('cotizaciones/(:num)/aprobar', 'CotizacionController::aprobar/$1');
-    $routes->post('cotizaciones/(:num)/pdf', 'CotizacionController::descargarPdf/$1');
-    $routes->post('cotizaciones/(:num)/confirmar', 'CotizacionController::confirmar/$1');
+    $routes->post('cotizaciones/(:num)/eliminar', 'CotizacionController::eliminar/$1');
+    $routes->post('cotizaciones/(:num)/aprobar', 'CotizacionController::aprobar/$1', ['filter' => 'auth:admin']);
+    $routes->post('cotizaciones/(:num)/pdf', 'CotizacionController::descargarPdf/$1', ['filter' => 'auth:admin']);
+    $routes->post('cotizaciones/(:num)/confirmar', 'CotizacionController::confirmar/$1', ['filter' => 'auth:admin']);
+
+    $routes->get('usuarios', 'UsuarioAdminController::index', ['filter' => 'auth:admin']);
+    $routes->post('usuarios', 'UsuarioAdminController::crear', ['filter' => 'auth:admin']);
+
+    $routes->get('solicitudes', 'SolicitudAdminController::index', ['filter' => 'auth:admin']);
+    $routes->post('solicitudes/(:num)/aprobar', 'SolicitudAdminController::resolver/$1/aprobar', ['filter' => 'auth:admin']);
+    $routes->post('solicitudes/(:num)/denegar', 'SolicitudAdminController::resolver/$1/denegar', ['filter' => 'auth:admin']);
+
+    $routes->get('contratos', 'ContratoController::index');
+    $routes->get('contratos/(:num)', 'ContratoController::editar/$1');
+    $routes->post('contratos/(:num)', 'ContratoController::actualizar/$1');
+    $routes->post('contratos/(:num)/eliminar', 'ContratoController::eliminar/$1', ['filter' => 'auth:admin']);
 });

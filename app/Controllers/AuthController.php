@@ -28,32 +28,43 @@ class AuthController extends BaseController
         $user = $db->table('usuarios')->where('usuario', $username)->get()->getRowArray();
 
         if ($user) {
-            // Verifica si está activo (1 o true)
-            if (isset($user['activo']) && (int)$user['activo'] === 0) {
+            $passwordHash = $user['password_hash'] ?? $user['password'] ?? '';
+            $activo = $user['activo'] ?? $user['estado'] ?? 1;
+
+            if ((int) $activo === 0) {
                 return redirect()->to('/login')->with('error', 'El usuario se encuentra inactivo.');
             }
 
-            // Compara la contraseña ingresada con el hash encriptado
-            if (password_verify($password, $user['password_hash'])) {
+            if (is_string($passwordHash) && password_verify((string) $password, $passwordHash)) {
                 $session->regenerate(true);
-                
-                // Actualizar ultimo_acceso
-                $db->table('usuarios')->where('id', $user['id'])->update([
-                    'ultimo_acceso' => date('Y-m-d H:i:s')
-                ]);
 
-                // Guardar datos clave en la sesión (compatibles con main.php)
+                $userId = (int) ($user['id'] ?? $user['usuario_id'] ?? 0);
+                if ($userId > 0) {
+                    $db->table('usuarios')->where($db->fieldExists('id', 'usuarios') ? 'id' : 'usuario_id', $userId)->update([
+                        'ultimo_acceso' => date('Y-m-d H:i:s'),
+                    ]);
+                }
+
+                $nombre = $user['nombre'] ?? $user['usuario'];
+                if (empty($user['nombre']) && ! empty($user['personal_id']) && $db->tableExists('personal')) {
+                    $personal = $db->table('personal')->where('id', $user['personal_id'])->get()->getRowArray();
+                    $nombre = $personal['nombre'] ?? $nombre;
+                }
+
+                $permisos = json_decode($user['permisos_json'] ?? 'null', true);
                 $sessionData = [
-                    'id_usuario' => $user['id'],
+                    'id_usuario' => $userId,
                     'usuario'    => $user['usuario'],
-                    'username'   => $user['usuario'],  // Se agrega 'username' para la vista main.php
+                    'username'   => $user['usuario'],
+                    'nombre'     => $nombre,
+                    'cargo'      => $user['cargo'] ?? '',
                     'rol'        => $user['rol'],
+                    'permisos'   => is_array($permisos) ? $permisos : null,
                     'isLoggedIn' => true,
-                    'logged_in'  => true               // Se agrega 'logged_in' para la vista main.php
+                    'logged_in'  => true,
                 ];
                 $session->set($sessionData);
 
-                // Redirige a la página principal
                 return redirect()->to(base_url('admin/cotizaciones'));
             }
         }

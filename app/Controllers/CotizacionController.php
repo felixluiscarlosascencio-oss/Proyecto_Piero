@@ -2,23 +2,68 @@
 
 namespace App\Controllers;
 
+use App\Libraries\AdminAccess;
 use App\Models\CotizacionModel;
+use App\Models\SolicitudAdminModel;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 
 class CotizacionController extends BaseController
 {
-    public function index(): string
+    public function index()
     {
+        if (! AdminAccess::can('cotizaciones.ver')) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No tienes permisos para ver cotizaciones.');
+        }
+
         $model = new CotizacionModel();
 
         return view('admin/cotizaciones/index', [
             'cotizaciones' => $model->orderBy('created_at', 'DESC')->findAll(),
+            'vigentes'     => false,
         ]);
+    }
+
+    public function vigentes()
+    {
+        if (! AdminAccess::can('cotizaciones.ver')) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No tienes permisos para ver cotizaciones.');
+        }
+
+        $cotizaciones = (new CotizacionModel())
+            ->whereIn('estado', [CotizacionModel::ESTADO_PENDIENTE, CotizacionModel::ESTADO_APROBADO])
+            ->groupStart()
+                ->where('vence_en', null)
+                ->orWhere('vence_en >=', date('Y-m-d H:i:s'))
+            ->groupEnd()
+            ->orderBy('vence_en', 'ASC')
+            ->findAll();
+
+        return view('admin/cotizaciones/index', ['cotizaciones' => $cotizaciones, 'vigentes' => true]);
+    }
+
+    public function ver(int $id)
+    {
+        if (! AdminAccess::can('cotizaciones.ver')) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No tienes permisos para ver cotizaciones.');
+        }
+
+        $cotizacion = (new CotizacionModel())->find($id);
+        if ($cotizacion === null) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se encontró la solicitud.');
+        }
+
+        $cotizacion['servicios'] = json_decode($cotizacion['servicios_json'], true, 512, JSON_THROW_ON_ERROR);
+
+        return view('admin/cotizaciones/editar', ['cotizacion' => $cotizacion, 'soloLectura' => true]);
     }
 
     public function editar(int $id)
     {
+        if (! AdminAccess::can('cotizaciones.editar')) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No tienes permiso para solicitar cambios en cotizaciones.');
+        }
+
         $cotizacion = (new CotizacionModel())->find($id);
 
         if ($cotizacion === null) {
@@ -34,11 +79,15 @@ class CotizacionController extends BaseController
 
         $cotizacion['servicios'] = json_decode($cotizacion['servicios_json'], true, 512, JSON_THROW_ON_ERROR);
 
-        return view('admin/cotizaciones/editar', ['cotizacion' => $cotizacion]);
+        return view('admin/cotizaciones/editar', ['cotizacion' => $cotizacion, 'soloLectura' => false]);
     }
 
     public function actualizar(int $id)
     {
+        if (! AdminAccess::isAdmin() && ! AdminAccess::can('cotizaciones.editar')) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No tienes permiso para solicitar cambios en cotizaciones.');
+        }
+
         $model = new CotizacionModel();
         $cotizacion = $model->find($id);
 
@@ -95,12 +144,28 @@ class CotizacionController extends BaseController
             return redirect()->back()->withInput()->with('error', 'El total por estudiante supera el máximo permitido.');
         }
 
-        if (! $model->update($id, [
+        $cambios = [
             'cantidad_estudiantes' => $cantidad,
             'servicios_json'       => json_encode($serviciosNormalizados, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
             'precio_unitario'      => $precioUnitario,
             'total_seccion'        => round($precioUnitario * $cantidad, 2),
-        ])) {
+        ];
+
+        if (! AdminAccess::isAdmin()) {
+            (new SolicitudAdminModel())->insert([
+                'entidad'       => 'cotizacion',
+                'entidad_id'    => $id,
+                'accion'        => 'editar',
+                'payload_json'  => json_encode($cambios, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+                'estado'        => 'pendiente',
+                'solicitado_por' => session()->get('id_usuario'),
+            ]);
+
+            return redirect()->to(base_url('admin/solicitudes'))
+                ->with('mensaje', 'La edición quedó pendiente de aprobación del administrador.');
+        }
+
+        if (! $model->update($id, $cambios)) {
             log_message('error', 'Failed to update quote #' . $id . ': ' . json_encode($model->errors()));
 
             return redirect()->back()->withInput()->with('error', 'No se pudo actualizar la cotización.');
@@ -109,8 +174,42 @@ class CotizacionController extends BaseController
         return redirect()->to(base_url('admin/cotizaciones/' . $id))->with('mensaje', 'Cotización actualizada.');
     }
 
+    public function eliminar(int $id)
+    {
+        if (! AdminAccess::isAdmin() && ! AdminAccess::can('cotizaciones.eliminar')) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No tienes permiso para solicitar la eliminación.');
+        }
+
+        $model = new CotizacionModel();
+        if ($model->find($id) === null) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se encontró la cotización.');
+        }
+
+        if (! AdminAccess::isAdmin()) {
+            (new SolicitudAdminModel())->insert([
+                'entidad'        => 'cotizacion',
+                'entidad_id'     => $id,
+                'accion'         => 'eliminar',
+                'estado'         => 'pendiente',
+                'solicitado_por' => session()->get('id_usuario'),
+            ]);
+
+            return redirect()->to(base_url('admin/solicitudes'))
+                ->with('mensaje', 'La eliminación quedó pendiente de aprobación del administrador.');
+        }
+
+        if (! $model->delete($id)) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se pudo eliminar la cotización.');
+        }
+
+        return redirect()->to(base_url('admin/cotizaciones'))->with('mensaje', 'Cotización eliminada.');
+    }
+
     public function aprobar(int $id)
     {
+        if (! AdminAccess::isAdmin()) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo el administrador puede aprobar cotizaciones.');
+        }
         $model = new CotizacionModel();
         $cotizacion = $model->find($id);
 
@@ -136,6 +235,9 @@ class CotizacionController extends BaseController
 
     public function descargarPdf(int $id)
     {
+        if (! AdminAccess::isAdmin()) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo el administrador puede generar la cotización.');
+        }
         $model = new CotizacionModel();
         $cotizacion = $model->find($id);
 
@@ -179,6 +281,9 @@ class CotizacionController extends BaseController
 
     public function confirmar(int $id)
     {
+        if (! AdminAccess::isAdmin()) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo el administrador puede confirmar cotizaciones.');
+        }
         $model = new CotizacionModel();
         $cotizacion = $model->find($id);
 
