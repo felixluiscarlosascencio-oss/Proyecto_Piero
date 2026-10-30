@@ -20,7 +20,7 @@
 <?php endif; ?>
 
 <section class="panel request-summary">
-    <h2>Datos recibidos del cliente</h2>
+    <h2>Datos de la cotización</h2>
     <p><strong>Colegio / institución:</strong> <?= esc($cotizacion['nombre_colegio']) ?></p>
     <p><strong>Cantidad de estudiantes:</strong> <?= esc($cotizacion['cantidad_estudiantes']) ?></p>
     <h3>Servicios cotizados</h3>
@@ -29,7 +29,7 @@
     <?php endforeach; ?>
 </section>
 
-<?php if (! $soloLectura && in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin'], true)): ?>
+<?php if (! $soloLectura && (in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin'], true) || ($administrador && $cotizacion['estado'] === 'pendiente'))): ?>
     <form class="panel quote-form" action="<?= base_url('admin/cotizaciones/' . $cotizacion['id']) ?>" method="post">
         <?= csrf_field() ?>
         <h2><?= $administrador ? 'Editar cotización' : 'Solicitar cambios de cotización' ?></h2>
@@ -52,20 +52,13 @@
         <button class="button primary" type="submit"><?= $administrador ? 'Guardar cambios' : 'Enviar solicitud al administrador' ?></button>
     </form>
 
-    <?php if ($cotizacion['estado'] === 'solicitud'): ?>
+    <?php if (in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin'], true)): ?>
         <?php if ($administrador): ?>
-            <form class="workflow-action" action="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/aprobar') ?>" method="post">
-                <?= csrf_field() ?>
-                <button class="button primary" type="submit">Aprobar por el administrador</button>
-            </form>
-        <?php endif; ?>
-    <?php else: ?>
-        <?php if ($administrador): ?>
-            <form class="panel workflow-action" action="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/pdf') ?>" method="post">
+            <form class="panel workflow-action" action="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/activar') ?>" method="post">
                 <?= csrf_field() ?>
                 <label for="dias_vigencia">Días de vigencia de la cotización (1–365)</label>
                 <input id="dias_vigencia" name="dias_vigencia" type="number" min="1" max="365" value="<?= esc(old('dias_vigencia', 15)) ?>" required>
-                <button class="button primary" type="submit">Generar y descargar PDF</button>
+                <button class="button primary" type="submit">Pasar a cotización vigente</button>
             </form>
         <?php endif; ?>
     <?php endif; ?>
@@ -73,19 +66,34 @@
     <section class="panel workflow-action">
         <h2>Cotización enviada al cliente</h2>
         <p>Vigencia: <?= esc($cotizacion['dias_vigencia']) ?> días, hasta <?= esc(date('d/m/Y', strtotime($cotizacion['vence_en']))) ?>.</p>
+        <?php if ($administrador): ?>
+            <form action="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/pdf') ?>" method="post">
+                <?= csrf_field() ?>
+                <button class="button secondary" type="submit">Descargar cotización PDF</button>
+            </form>
+        <?php endif; ?>
         <?php if ($administrador && ! $soloLectura): ?>
             <form action="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/confirmar') ?>" method="post">
                 <?= csrf_field() ?>
-                <button class="button primary" type="submit">Marcar como aprobado por el cliente</button>
+                <button class="button primary" type="submit">Confirmar cliente y crear contrato</button>
+            </form>
+        <?php endif; ?>
+    </section>
+<?php elseif ($cotizacion['estado'] === 'aprobado'): ?>
+    <section class="panel workflow-action">
+        <h2>Cotización confirmada por el cliente</h2>
+        <?php if (! empty($contratoId)): ?>
+            <a class="button primary" href="<?= base_url('admin/contratos/' . $contratoId) ?>">Abrir contrato</a>
+        <?php elseif ($administrador): ?>
+            <form action="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/confirmar') ?>" method="post">
+                <?= csrf_field() ?>
+                <button class="button primary" type="submit">Crear contrato</button>
             </form>
         <?php endif; ?>
     </section>
 <?php else: ?>
     <section class="panel workflow-action">
-        <?php if ($cotizacion['estado'] === 'aprobado'): ?>
-            <h2>Cotización aprobada por el cliente</h2>
-            <p>Ya se puede coordinar el calendario y las sesiones fotográficas.</p>
-        <?php elseif ($cotizacion['estado'] === 'solicitud'): ?>
+        <?php if ($cotizacion['estado'] === 'solicitud'): ?>
             <h2>Solicitud pendiente de revisión</h2>
         <?php else: ?>
             <h2>Cotización aprobada por el administrador</h2>
@@ -94,7 +102,7 @@
     </section>
 <?php endif; ?>
 
-    <?php if (! $soloLectura && $administrador && in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin'], true)): ?>
+    <?php if (! $soloLectura && $administrador && in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin', 'pendiente'], true)): ?>
         <dialog id="save-dialog" aria-labelledby="save-title">
             <h2 id="save-title">Confirmar cambios</h2>
             <p>Los cambios se aplicarán inmediatamente a esta cotización.</p>

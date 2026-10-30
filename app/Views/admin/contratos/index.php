@@ -29,7 +29,7 @@
                         <td>
                             <div class="inline-actions">
                                 <a class="button secondary compact" href="<?= base_url('admin/contratos/' . $contrato['id']) ?>">Ver / editar</a>
-                                <?php if (! $cerrado && \App\Libraries\AdminAccess::isAdmin()): ?>
+                                <?php if (\App\Libraries\AdminAccess::isOwner()): ?>
                                     <button class="button danger compact" type="button" data-delete-url="<?= base_url('admin/contratos/' . $contrato['id'] . '/eliminar') ?>" data-delete-label="contrato <?= esc($contrato['numero_contrato'] ?: '#' . $contrato['id']) ?>">Eliminar</button>
                                 <?php endif; ?>
                             </div>
@@ -41,7 +41,7 @@
     </section>
 <?php endif; ?>
 
-<?php if (\App\Libraries\AdminAccess::isAdmin()): ?>
+<?php if (\App\Libraries\AdminAccess::isOwner()): ?>
     <dialog id="delete-dialog" aria-labelledby="delete-title">
         <form id="delete-form" method="post">
             <?= csrf_field() ?>

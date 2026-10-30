@@ -24,7 +24,7 @@ class UsuarioAdminController extends BaseController
         }
 
         $usuarios = Database::connect()->table('usuarios')
-            ->select('id, nombre, usuario, cargo, rol, activo')
+            ->select('id, nombre, usuario, cargo, rol, activo, creado_por, permisos_json')
             ->orderBy('nombre', 'ASC')
             ->get()
             ->getResultArray();
@@ -74,9 +74,72 @@ class UsuarioAdminController extends BaseController
             'cargo'         => trim($this->request->getPost('cargo')),
             'rol'           => $this->request->getPost('rol'),
             'permisos_json' => json_encode($permissions, JSON_THROW_ON_ERROR),
+            'creado_por'    => (int) session()->get('id_usuario'),
             'activo'        => 1,
         ]);
 
         return redirect()->to(base_url('admin/usuarios'))->with('mensaje', 'Cuenta del equipo creada.');
+    }
+
+    public function actualizar(int $id)
+    {
+        if (! AdminAccess::isAdmin()) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No tienes permisos para realizar esta acción.');
+        }
+
+        $rules = [
+            'nombre' => 'required|string|min_length[2]|max_length[100]',
+            'cargo'  => 'required|string|min_length[2]|max_length[80]',
+            'rol'    => 'required|in_list[' . implode(',', self::ROLES) . ']',
+        ];
+        if (! $this->validate($rules)) {
+            return redirect()->back()->withInput()->with('error', implode(' ', $this->validator->getErrors()));
+        }
+
+        $db = Database::connect();
+        $usuario = $db->table('usuarios')->where('id', $id)->get()->getRowArray();
+        if ($usuario === null) {
+            return redirect()->to(base_url('admin/usuarios'))->with('error', 'No se encontró la cuenta.');
+        }
+        if (in_array($usuario['rol'], ['Dueno', 'Admin'], true)) {
+            return redirect()->to(base_url('admin/usuarios'))->with('error', 'Las cuentas administrativas están protegidas.');
+        }
+
+        $permissions = $this->request->getPost('permisos');
+        $permissions = is_array($permissions) ? array_filter($permissions, 'is_string') : [];
+        $permissions = array_values(array_intersect(array_unique($permissions), array_keys(self::PERMISSIONS)));
+
+        $db->table('usuarios')->where('id', $id)->update([
+            'nombre'        => trim($this->request->getPost('nombre')),
+            'cargo'         => trim($this->request->getPost('cargo')),
+            'rol'           => $this->request->getPost('rol'),
+            'permisos_json' => json_encode($permissions, JSON_THROW_ON_ERROR),
+        ]);
+
+        return redirect()->to(base_url('admin/usuarios'))->with('mensaje', 'Cuenta actualizada.');
+    }
+
+    public function eliminar(int $id)
+    {
+        if (! AdminAccess::isAdmin()) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No tienes permisos para realizar esta acción.');
+        }
+
+        if ($id === (int) session()->get('id_usuario')) {
+            return redirect()->to(base_url('admin/usuarios'))->with('error', 'No puedes eliminar tu propia cuenta.');
+        }
+
+        $db = Database::connect();
+        $usuario = $db->table('usuarios')->where('id', $id)->get()->getRowArray();
+        if ($usuario === null || (int) ($usuario['creado_por'] ?? 0) !== (int) session()->get('id_usuario')) {
+            return redirect()->to(base_url('admin/usuarios'))->with('error', 'Solo puedes eliminar las cuentas que tú creaste.');
+        }
+        if (in_array($usuario['rol'], ['Dueno', 'Admin'], true)) {
+            return redirect()->to(base_url('admin/usuarios'))->with('error', 'Las cuentas administrativas están protegidas.');
+        }
+
+        $db->table('usuarios')->where('id', $id)->delete();
+
+        return redirect()->to(base_url('admin/usuarios'))->with('mensaje', 'Cuenta eliminada.');
     }
 }

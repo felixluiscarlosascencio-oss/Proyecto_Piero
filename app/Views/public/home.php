@@ -45,7 +45,7 @@
         <form id="solicitud-cotizacion" class="solicitud-form" action="<?= base_url('cotizaciones/solicitar') ?>" method="post">
             <?= csrf_field() ?>
             <div class="form-group">
-                <label for="nombre_colegio">Nombre del colegio o institución</label>
+                <label for="nombre_colegio">Nombre de la institución</label>
                 <input id="nombre_colegio" name="nombre_colegio" type="text" maxlength="150" required>
             </div>
             <div class="form-group">
@@ -53,10 +53,13 @@
                 <input id="cantidad_estudiantes" name="cantidad_estudiantes" type="number" min="1" max="10000" required>
             </div>
             <fieldset>
-                <legend>Servicios de interés</legend>
+                <legend> Servicios  </legend>
                 <label><input type="checkbox" name="servicios[]" value="Paquete Base Anuario"> Paquete Base Anuario</label>
                 <label><input type="checkbox" name="servicios[]" value="Sesión de Exteriores y Drone"> Sesión de Exteriores y Drone</label>
                 <label><input type="checkbox" name="servicios[]" value="Cuadro Retrato de Graduación"> Cuadro Retrato de Graduación</label>
+                <label><input type="checkbox" name="servicios[]" value="Cuadro Retrato de Graduación"> Cuadro Giratorio de Graducacion</label>
+                <label><input type="checkbox" name="servicios[]" value="Cuadro Retrato de Graduación"> Cuadro de Graduación</label>
+
             </fieldset>
             <button class="boton" type="submit">Enviar solicitud por WhatsApp</button>
             <p id="solicitud-mensaje" role="status" aria-live="polite"></p>

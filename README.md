@@ -27,15 +27,29 @@ prepara un mensaje estructurado de WhatsApp para que el cliente lo envíe al
 número comercial configurado en `app/Helpers/contacto_helper.php`.
 
 El panel requiere autenticación y está disponible en `/admin/cotizaciones`.
-Los estados de cada cotización son:
+El administrador también puede crear cotizaciones desde el panel. Los estados de
+cada cotización son:
 
 1. `solicitud`: recibida y pendiente de revisión.
-2. `aprobada_admin`: precios revisados y aprobados; habilita el PDF.
-3. `pendiente`: PDF generado y cotización vigente para el cliente.
-4. `aprobado`: confirmada por el cliente; permite coordinar producción.
+2. `aprobada_admin`: precios revisados; permite configurar la vigencia.
+3. `pendiente`: cotización vigente hasta `vence_en`; el administrador puede
+  descargar el PDF o confirmar al cliente.
+4. `aprobado`: confirmada y vinculada a un contrato.
 
-La vigencia se indica al generar el PDF. La estructura de la tabla de este flujo
-se gestiona exclusivamente mediante la migración de CodeIgniter.
+La vigencia se activa con un plazo de 1 a 365 días. Al confirmar una cotización
+vigente se crea un registro en `contratos`, vinculado mediante `cotizacion_id`.
+Los servicios, las fechas de sesiones y los detalles/cantidades de cuadros se
+guardan como JSON editable en el contrato; la lista de estudiantes permanece en
+`alumnos`.
+
+Las cuentas nuevas registran su creador en `usuarios.creado_por`. Solo este
+administrador puede eliminarlas desde el panel. Las cuentas antiguas, cuyo
+creador queda desconocido, no son eliminables bajo esa regla. La eliminación de
+contratos se reserva al rol `Dueno`.
+
+Los cambios estructurales están en la migración
+`2026-10-30-000001_AddAccountOwnershipAndContractDetails`; aplica las migraciones
+con `php spark migrate` antes de usar las nuevas funciones.
 
 ARCHIVO .env
 CI_ENVIRONMENT = development

@@ -6,6 +6,9 @@
         <h1><?= ! empty($vigentes) ? 'Cotizaciones vigentes' : 'Cotizaciones' ?></h1>
         <p><?= ! empty($vigentes) ? 'Propuestas aprobadas y dentro de su periodo de vigencia.' : 'Revisa las solicitudes recibidas desde el cotizador público.' ?></p>
     </div>
+    <?php if (! empty($puedeCrear)): ?>
+        <a class="button primary" href="<?= base_url('admin/cotizaciones/nueva') ?>">Crear cotización</a>
+    <?php endif; ?>
 </div>
 
 <?php if ($mensaje = session()->getFlashdata('mensaje')): ?>
@@ -40,10 +43,18 @@
                 <?php endif; ?>
                 <div class="action-row">
                     <a class="button secondary compact" href="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/ver') ?>">Ver</a>
-                    <?php if ($puedeEditar && in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin'], true)): ?>
+                    <?php if ($cotizacion['estado'] === 'aprobado' && ! empty($cotizacion['contrato_id'])): ?>
+                        <a class="button secondary compact" href="<?= base_url('admin/contratos/' . $cotizacion['contrato_id']) ?>">Abrir contrato</a>
+                    <?php elseif ($cotizacion['estado'] === 'aprobado' && \App\Libraries\AdminAccess::isAdmin()): ?>
+                        <form action="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/confirmar') ?>" method="post">
+                            <?= csrf_field() ?>
+                            <button class="button primary compact" type="submit">Crear contrato</button>
+                        </form>
+                    <?php endif; ?>
+                    <?php if (($puedeEditar && in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin'], true)) || (\App\Libraries\AdminAccess::isAdmin() && $cotizacion['estado'] === 'pendiente')): ?>
                         <a class="button secondary compact" href="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/editar') ?>">Editar</a>
                     <?php endif; ?>
-                    <?php if ($puedeEliminar): ?>
+                    <?php if ($puedeEliminar && $cotizacion['estado'] !== 'aprobado'): ?>
                         <button class="button danger compact" type="button" data-delete-url="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/eliminar') ?>" data-delete-label="Solicitud #<?= esc($cotizacion['id']) ?>">Eliminar</button>
                     <?php endif; ?>
                 </div>
