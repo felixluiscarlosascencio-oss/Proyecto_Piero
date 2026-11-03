@@ -13,53 +13,44 @@
 <form class="panel quote-form" action="<?= base_url('admin/cotizaciones/crear') ?>" method="post">
     <?= csrf_field() ?>
     <div class="form-grid">
-        <label class="form-field full">Colegio o institución
+        <label class="form-field full">Nombre de la institución
             <input name="nombre_colegio" maxlength="150" value="<?= esc(old('nombre_colegio')) ?>" required>
         </label>
-                <label class="form-field full">Secciones de los estudiantes
-            <input name="nombre_colegio" maxlength="10" value="<?= esc(old('nombre_colegio')) ?>" required>
+        <label class="form-field full">Nombre de la promoción o sección <span>(opcional)</span>
+            <input name="nombre_seccion" maxlength="120" value="<?= esc(old('nombre_seccion')) ?>">
         </label>
-        <label class="form-field">Cantidad de estudiantes
+        <label class="form-field">Cantidad de alumnos
             <input name="cantidad_estudiantes" type="number" min="1" max="10000" value="<?= esc(old('cantidad_estudiantes', 1)) ?>" required>
         </label>
+        <label class="form-field">Persona encargada o tesorera
+            <input name="persona_encargada" maxlength="150" value="<?= esc(old('persona_encargada')) ?>" required>
+        </label>
+        <label class="form-field">Teléfono / WhatsApp de contacto
+            <input name="telefono_contacto" type="tel" maxlength="30" value="<?= esc(old('telefono_contacto')) ?>" required>
+        </label>
     </div>
-    <h2>Servicios</h2>
-    <div id="service-list">
-        <?php $serviciosAnteriores = old('servicios'); ?>
-        <?php if (! is_array($serviciosAnteriores) || $serviciosAnteriores === []): ?>
-            <?php $serviciosAnteriores = [['nombre' => '', 'precio_unitario' => 0]]; ?>
-        <?php endif; ?>
-        <?php foreach ($serviciosAnteriores as $indice => $servicio): ?>
-            <div class="service-row">
-                <label>Servicio
-                    <input name="servicios[<?= esc($indice) ?>][nombre]" maxlength="120" value="<?= esc($servicio['nombre'] ?? '') ?>" required>
+    <h2>Selección de servicios</h2>
+    <?php $serviciosAnteriores = old('servicios', []); ?>
+    <?php if ($serviciosCatalogo === []): ?>
+        <p>No hay servicios activos en el catálogo. Configura el catálogo antes de crear cotizaciones.</p>
+    <?php else: ?>
+        <div class="service-selection">
+            <?php foreach ($serviciosCatalogo as $servicio): ?>
+                <?php
+                $idsSeleccionados = is_array($serviciosAnteriores)
+                    ? array_map(static fn ($value): string => is_scalar($value) ? (string) $value : '', $serviciosAnteriores)
+                    : [];
+                ?>
+                <label class="service-selection-row">
+                    <input type="checkbox" name="servicios[]" value="<?= esc($servicio['id']) ?>" <?= in_array((string) $servicio['id'], $idsSeleccionados, true) ? 'checked' : '' ?>>
+                    <span><?= esc($servicio['nombre_item']) ?></span>
+                    <strong><?= (float) $servicio['precio_unitario'] > 0 ? 'S/ ' . number_format((float) $servicio['precio_unitario'], 2) . ' por alumno' : 'Precio a consultar' ?></strong>
                 </label>
-                <label>Precio por estudiante (S/)
-                    <input name="servicios[<?= esc($indice) ?>][precio_unitario]" type="number" min="0" step="0.01" value="<?= esc($servicio['precio_unitario'] ?? 0) ?>" required>
-                </label>
-            </div>
-        <?php endforeach; ?>
-    </div>
-    <button class="button secondary" id="add-service" type="button">Agregar servicio</button>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
     <div class="action-row">
-        <button class="button primary" type="submit">Crear cotización</button>
+        <button class="button primary" type="submit" <?= $serviciosCatalogo === [] ? 'disabled' : '' ?>>Crear cotización</button>
     </div>
 </form>
-
-<script>
-    const serviceList = document.getElementById('service-list');
-    document.getElementById('add-service').addEventListener('click', () => {
-        const index = serviceList.querySelectorAll('.service-row').length;
-        const row = document.createElement('div');
-        row.className = 'service-row';
-        row.innerHTML = `
-            <label>Servicio
-                <input name="servicios[${index}][nombre]" maxlength="120" required>
-            </label>
-            <label>Precio por estudiante (S/)
-                <input name="servicios[${index}][precio_unitario]" type="number" min="0" step="0.01" value="0" required>
-            </label>`;
-        serviceList.append(row);
-    });
-</script>
 <?= $this->endSection() ?>

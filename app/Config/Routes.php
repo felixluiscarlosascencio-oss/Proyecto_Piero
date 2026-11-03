@@ -15,14 +15,12 @@ $routes->group('admin', ['filter' => 'auth'], static function ($routes): void {
     $routes->get('cotizaciones/vigentes', 'CotizacionController::vigentes');
     $routes->get('cotizaciones/nueva', 'CotizacionController::nueva', ['filter' => 'auth:admin']);
     $routes->post('cotizaciones/crear', 'CotizacionController::crear', ['filter' => 'auth:admin']);
-    $routes->get('cotizaciones/(:num)/editar', 'CotizacionController::editar/$1');
     $routes->get('cotizaciones/(:num)/ver', 'CotizacionController::ver/$1');
     $routes->get('cotizaciones/(:num)', 'CotizacionController::ver/$1');
-    $routes->post('cotizaciones/(:num)', 'CotizacionController::actualizar/$1');
     $routes->post('cotizaciones/(:num)/eliminar', 'CotizacionController::eliminar/$1');
     $routes->post('cotizaciones/(:num)/activar', 'CotizacionController::activar/$1', ['filter' => 'auth:admin']);
+    $routes->post('cotizaciones/(:num)/contrato', 'CotizacionController::pasarAContrato/$1', ['filter' => 'auth:admin']);
     $routes->post('cotizaciones/(:num)/pdf', 'CotizacionController::descargarPdf/$1', ['filter' => 'auth:admin']);
-    $routes->post('cotizaciones/(:num)/confirmar', 'CotizacionController::confirmar/$1', ['filter' => 'auth:admin']);
 
     $routes->get('usuarios', 'UsuarioAdminController::index', ['filter' => 'auth:admin']);
     $routes->post('usuarios', 'UsuarioAdminController::crear', ['filter' => 'auth:admin']);

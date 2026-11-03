@@ -5,10 +5,10 @@ namespace App\Libraries;
 class AdminAccess
 {
     private const DEFAULT_PERMISSIONS = [
-        'Secretaria' => ['cotizaciones.ver', 'cotizaciones.editar', 'cotizaciones.eliminar', 'contratos.ver', 'contratos.editar'],
-        'Encargado'  => ['cotizaciones.ver', 'cotizaciones.editar', 'cotizaciones.eliminar', 'contratos.ver', 'contratos.editar'],
-        'Fotografo'  => ['cotizaciones.ver', 'cotizaciones.editar', 'contratos.ver'],
-        'Produccion' => ['cotizaciones.ver', 'cotizaciones.editar', 'contratos.ver', 'contratos.editar'],
+        'Secretaria' => ['cotizaciones.ver', 'cotizaciones.eliminar', 'contratos.ver', 'contratos.editar'],
+        'Encargado'  => ['cotizaciones.ver', 'cotizaciones.eliminar', 'contratos.ver', 'contratos.editar'],
+        'Fotografo'  => ['cotizaciones.ver', 'contratos.ver'],
+        'Produccion' => ['cotizaciones.ver', 'contratos.ver', 'contratos.editar'],
     ];
 
     public static function isAdmin(): bool

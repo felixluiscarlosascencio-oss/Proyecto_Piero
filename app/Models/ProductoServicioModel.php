@@ -13,17 +13,16 @@ class ProductoServicioModel extends Model
     protected $useSoftDeletes   = false;
     protected $protectFields    = true;
 
-    // Ajusta o confirma los campos exactos según tu migración de productos/servicios
     protected $allowedFields    = [
-        'nombre', 
-        'descripcion', 
-        'precio_base', 
+        'nombre_item',
         'tipo',
-        'created_at',
-        'updated_at'
+        'descripcion',
+        'detalle_largo',
+        'precio_unitario',
+        'estado',
+        'galeria_json',
+        'creado_en',
     ];
 
-    protected $useTimestamps = true;
-    protected $createdField  = 'created_at';
-    protected $updatedField  = 'updated_at';
+    protected $useTimestamps = false;
 }

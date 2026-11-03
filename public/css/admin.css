@@ -73,6 +73,14 @@ input[type="checkbox"] { accent-color: var(--admin-accent); width: auto; }
 .form-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .form-field { display: grid; gap: 7px; }
 .form-field.full { grid-column: 1 / -1; }
+.service-selection { display: grid; gap: 9px; margin: 14px 0 20px; }
+.service-selection-row { align-items: center; border: 1px solid var(--admin-line); border-radius: 5px; display: grid; gap: 12px; grid-template-columns: auto minmax(0, 1fr) auto; padding: 12px; }
+.service-selection-row strong { color: var(--admin-accent); font-size: 13px; }
+.quote-details { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0 0 24px; }
+.quote-details > div { border-bottom: 1px solid var(--admin-line); padding: 0 0 10px; }
+.quote-details dt { color: var(--admin-muted); font-size: 12px; margin-bottom: 4px; }
+.quote-details dd { margin: 0; }
+.quote-service-list { color: #d7dcd5; line-height: 1.8; padding-left: 22px; }
 .permission-list { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .permission-list label { align-items: center; display: flex; gap: 9px; }
 .student-row { align-items: center; border-bottom: 1px solid var(--admin-line); display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) auto; padding: 12px 0; }
@@ -93,6 +101,9 @@ dialog::backdrop { background: rgb(0 0 0 / 68%); }
     .admin-main { padding: 26px 15px 40px; }
     .page-heading, .quote-heading { align-items: flex-start; flex-direction: column; }
     .service-row, .form-grid, .permission-list { grid-template-columns: 1fr; }
+    .quote-details { grid-template-columns: 1fr; }
+    .service-selection-row { grid-template-columns: auto minmax(0, 1fr); }
+    .service-selection-row strong { grid-column: 2; }
     .form-field.full { grid-column: auto; }
     .table-wrap { overflow-x: auto; }
     .data-table { min-width: 620px; }

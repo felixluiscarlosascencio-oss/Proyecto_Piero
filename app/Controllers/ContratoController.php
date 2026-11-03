@@ -53,12 +53,16 @@ class ContratoController extends BaseController
         }
 
         $cantidad = filter_var($this->request->getPost('cant_alumnos_inicial'), FILTER_VALIDATE_INT);
-        $nivel = trim((string) $this->request->getPost('nivel'));
-        $aula = trim((string) $this->request->getPost('aula'));
-        $observaciones = trim((string) $this->request->getPost('observaciones'));
+        $nombreColegio = $this->postString('nombre_colegio');
+        $nombreSeccion = $this->postString('nombre_seccion');
+        $personaEncargada = $this->postString('persona_encargada');
+        $telefonoContacto = $this->postString('telefono_contacto');
+        $nivel = $this->postString('nivel');
+        $aula = $this->postString('aula');
+        $observaciones = $this->postString('observaciones');
         $retirarAlumnoId = filter_var($this->request->getPost('retirar_alumno_id'), FILTER_VALIDATE_INT);
         $nuevoAlumno = $retirarAlumnoId === false
-            ? trim((string) $this->request->getPost('nuevo_alumno'))
+            ? $this->postString('nuevo_alumno')
             : '';
 
         $serviciosInput = $this->request->getPost('servicios');
@@ -68,8 +72,12 @@ class ContratoController extends BaseController
         $cuadrosInput = $this->request->getPost('cuadros');
         $cuadros = [];
 
-        if ($cantidad === false || $cantidad < 1 || $cantidad > 10000 || mb_strlen($nivel) > 50 || mb_strlen($aula) > 50 || mb_strlen($observaciones) > 10000 || mb_strlen($nuevoAlumno) > 150) {
-            return redirect()->back()->withInput()->with('error', 'Revisa la cantidad, nivel, aula y observaciones.');
+        if ($cantidad === false || $cantidad < 1 || $cantidad > 10000
+            || $nombreColegio === '' || mb_strlen($nombreColegio) > 150
+            || mb_strlen($nombreSeccion) > 120 || $personaEncargada === '' || mb_strlen($personaEncargada) > 150
+            || ! preg_match('/^[0-9+().\s-]{7,30}$/', $telefonoContacto)
+            || mb_strlen($nivel) > 50 || mb_strlen($aula) > 50 || mb_strlen($observaciones) > 10000 || mb_strlen($nuevoAlumno) > 150) {
+            return redirect()->back()->withInput()->with('error', 'Revisa los datos de contacto, cantidad, nivel, aula y observaciones.');
         }
 
         if (! is_array($serviciosInput) || ! is_array($agendaInput) || ! is_array($cuadrosInput)) {
@@ -138,6 +146,10 @@ class ContratoController extends BaseController
         $db->transBegin();
         $montoPagado = (float) ($contrato['monto_pagado'] ?? 0);
         $actualizado = $db->table('contratos')->where('id', $id)->update([
+            'nombre_colegio'       => $nombreColegio,
+            'nombre_seccion'       => $nombreSeccion !== '' ? $nombreSeccion : null,
+            'persona_encargada'    => $personaEncargada,
+            'telefono_contacto'    => $telefonoContacto,
             'nivel'                => $nivel,
             'aula'                 => $aula,
             'cant_alumnos_inicial' => $cantidad,
@@ -198,5 +210,12 @@ class ContratoController extends BaseController
         }
 
         return redirect()->to(base_url('admin/contratos'))->with('mensaje', 'Contrato eliminado.');
+    }
+
+    private function postString(string $field): string
+    {
+        $value = $this->request->getPost($field);
+
+        return is_string($value) ? trim($value) : '';
     }
 }

@@ -208,8 +208,8 @@ section[id] {
 }
 
 .solicitud-form .form-group { margin-bottom: 1.25rem; }
-.solicitud-form label, .solicitud-form legend { font-weight: 600; }
-.solicitud-form input[type="text"], .solicitud-form input[type="number"] {
+.solicitud-form label { font-weight: 600; }
+.solicitud-form .form-control {
     border: 1px solid #cbd5e1;
     border-radius: 8px;
     display: block;
@@ -218,9 +218,23 @@ section[id] {
     padding: 0.75rem;
     width: 100%;
 }
-.solicitud-form fieldset { border: 0; margin: 1rem 0 1.5rem; }
-.solicitud-form fieldset label { display: block; font-weight: 400; margin: 0.5rem 0; }
-.solicitud-form fieldset input { margin-right: 0.5rem; }
+
+.servicio-card { text-align: left; }
+.servicio-precio { margin-top: 1rem; color: var(--color-oscuro) !important; font-weight: 700; }
+.servicio-seleccion { display: flex; align-items: center; gap: .55rem; margin-top: 1.25rem; font-weight: 600; cursor: pointer; }
+.servicio-seleccion input { accent-color: var(--color-dorado-hover); width: 1.1rem; height: 1.1rem; }
+.servicio-detalle { margin-top: 1rem; border-top: 1px solid #e2e8f0; padding-top: .8rem; }
+.servicio-detalle summary { color: #80630e; font-weight: 700; cursor: pointer; }
+.servicio-detalle p { margin-top: .7rem; }
+.servicio-galeria { display: flex; gap: .6rem; overflow-x: auto; margin-top: .8rem; }
+.servicio-galeria img { width: 110px; height: 90px; border-radius: 8px; object-fit: cover; }
+.contador-alumnos { display: flex; align-items: center; gap: .5rem; margin-top: .4rem; }
+.contador-alumnos input { text-align: center; margin-top: 0 !important; }
+.contador-alumnos button { border: 0; border-radius: 8px; background: var(--color-oscuro); color: #fff; font: inherit; font-size: 1.3rem; width: 44px; height: 44px; cursor: pointer; }
+.solicitud-form .campo-oculto { position: absolute; left: -10000px; width: 1px; height: 1px; }
+.solicitud-form .g-recaptcha { margin: 0 0 1.25rem; }
+.captcha-aviso { color: #9b1c1c; margin-bottom: 1rem; }
+.solicitud-form button:disabled { opacity: .6; cursor: not-allowed; }
 .solicitud-form #solicitud-mensaje { margin: 1rem 0 0; }
 
 /* ===================================

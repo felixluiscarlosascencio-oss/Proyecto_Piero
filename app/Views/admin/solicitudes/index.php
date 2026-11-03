@@ -16,29 +16,27 @@
 <?php else: ?>
     <div class="record-list">
         <?php foreach ($solicitudes as $solicitud): ?>
-            <?php $payload = json_decode($solicitud['payload_json'] ?? '[]', true) ?: []; ?>
-            <?php $serviciosPropuestos = json_decode($payload['servicios_json'] ?? '[]', true) ?: []; ?>
             <article class="panel">
                 <div class="quote-heading">
                     <div>
                         <span class="quote-id">Solicitud #<?= esc($solicitud['id']) ?></span>
-                        <h2><?= $solicitud['accion'] === 'eliminar' ? 'Eliminar' : 'Editar' ?> cotización #<?= esc($solicitud['entidad_id']) ?></h2>
+                        <h2><?= $solicitud['accion'] === 'eliminar' ? 'Eliminar' : 'Edición no disponible' ?> cotización #<?= esc($solicitud['entidad_id']) ?></h2>
                     </div>
                     <span class="status status-<?= esc($solicitud['estado']) ?>"><?= esc(ucfirst($solicitud['estado'])) ?></span>
                 </div>
                 <p><strong>Solicitante:</strong> <?= esc($solicitud['solicitante_nombre'] ?: $solicitud['solicitante_usuario'] ?: 'Cuenta de equipo') ?></p>
                 <p><strong>Fecha:</strong> <?= esc($solicitud['created_at'] ? date('d/m/Y H:i', strtotime($solicitud['created_at'])) : 'Sin fecha') ?></p>
                 <?php if ($solicitud['accion'] === 'editar'): ?>
-                    <p><strong>Estudiantes propuestos:</strong> <?= esc($payload['cantidad_estudiantes'] ?? 'Sin cambio') ?></p>
-                    <p><strong>Servicios propuestos:</strong> <?= esc(implode(', ', array_column($serviciosPropuestos, 'nombre'))) ?></p>
-                    <p><strong>Total propuesto:</strong> S/ <?= number_format((float) ($payload['total_seccion'] ?? 0), 2) ?></p>
+                    <p>Esta solicitud de edición pertenece al flujo anterior y ya no se puede aprobar.</p>
                 <?php endif; ?>
                 <?php if ($solicitud['estado'] === 'pendiente'): ?>
                     <div class="inline-actions">
-                        <form action="<?= base_url('admin/solicitudes/' . $solicitud['id'] . '/aprobar') ?>" method="post">
-                            <?= csrf_field() ?>
-                            <button class="button primary" type="submit">Confirmar solicitud</button>
-                        </form>
+                        <?php if ($solicitud['accion'] === 'eliminar'): ?>
+                            <form action="<?= base_url('admin/solicitudes/' . $solicitud['id'] . '/aprobar') ?>" method="post">
+                                <?= csrf_field() ?>
+                                <button class="button primary" type="submit">Confirmar eliminación</button>
+                            </form>
+                        <?php endif; ?>
                         <form action="<?= base_url('admin/solicitudes/' . $solicitud['id'] . '/denegar') ?>" method="post">
                             <?= csrf_field() ?>
                             <button class="button secondary" type="submit">Denegar</button>

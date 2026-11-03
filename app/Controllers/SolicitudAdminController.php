@@ -52,22 +52,20 @@ class SolicitudAdminController extends BaseController
             }
 
             if ($solicitud['accion'] === 'eliminar') {
+                if ($db->table('contratos')->where('cotizacion_id', $cotizacion['id'])->countAllResults() > 0) {
+                    $db->transRollback();
+
+                    return redirect()->to(base_url('admin/solicitudes'))->with('error', 'No se puede eliminar una cotización convertida a contrato.');
+                }
                 if (! $cotizaciones->delete((int) $cotizacion['id'])) {
                     $db->transRollback();
 
                     return redirect()->to(base_url('admin/solicitudes'))->with('error', 'No se pudo eliminar la cotización.');
                 }
-            } elseif ($solicitud['accion'] === 'editar') {
-                $payload = json_decode($solicitud['payload_json'] ?? '[]', true);
-                if (! is_array($payload) || ! $cotizaciones->update((int) $cotizacion['id'], $payload)) {
-                    $db->transRollback();
-
-                    return redirect()->to(base_url('admin/solicitudes'))->with('error', 'No se pudo aplicar la edición solicitada.');
-                }
             } else {
                 $db->transRollback();
 
-                return redirect()->to(base_url('admin/solicitudes'))->with('error', 'La acción solicitada no es válida.');
+                return redirect()->to(base_url('admin/solicitudes'))->with('error', 'Las ediciones de cotización ya no están permitidas; puedes denegar esta solicitud antigua.');
             }
         }
 

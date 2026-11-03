@@ -18,6 +18,18 @@
         <?= csrf_field() ?>
         <h2>Datos del contrato</h2>
         <div class="form-grid">
+            <label class="form-field full">Nombre de la institución
+                <input name="nombre_colegio" maxlength="150" value="<?= esc(old('nombre_colegio', $contrato['nombre_colegio'] ?? '')) ?>" required>
+            </label>
+            <label class="form-field">Promoción / sección
+                <input name="nombre_seccion" maxlength="120" value="<?= esc(old('nombre_seccion', $contrato['nombre_seccion'] ?? '')) ?>">
+            </label>
+            <label class="form-field">Persona encargada o tesorera
+                <input name="persona_encargada" maxlength="150" value="<?= esc(old('persona_encargada', $contrato['persona_encargada'] ?? '')) ?>" required>
+            </label>
+            <label class="form-field">Teléfono / WhatsApp
+                <input name="telefono_contacto" type="tel" maxlength="30" value="<?= esc(old('telefono_contacto', $contrato['telefono_contacto'] ?? '')) ?>" required>
+            </label>
             <label class="form-field">Nivel
                 <input name="nivel" maxlength="50" value="<?= esc(old('nivel', $contrato['nivel'] ?? '')) ?>">
             </label>
@@ -100,6 +112,10 @@
 <?php else: ?>
     <section class="panel">
         <h2>Datos del contrato</h2>
+        <p><strong>Institución:</strong> <?= esc($contrato['nombre_colegio'] ?? 'Sin especificar') ?></p>
+        <p><strong>Promoción / sección:</strong> <?= esc($contrato['nombre_seccion'] ?? 'Sin especificar') ?></p>
+        <p><strong>Persona encargada:</strong> <?= esc($contrato['persona_encargada'] ?? 'Sin especificar') ?></p>
+        <p><strong>Teléfono / WhatsApp:</strong> <?= esc($contrato['telefono_contacto'] ?? 'Sin especificar') ?></p>
         <p><strong>Nivel / aula:</strong> <?= esc(trim(($contrato['nivel'] ?? '') . ' ' . ($contrato['aula'] ?? '')) ?: 'Sin especificar') ?></p>
         <p><strong>Alumnos iniciales:</strong> <?= esc($contrato['cant_alumnos_inicial'] ?? 0) ?></p>
         <p><strong>Observaciones:</strong> <?= nl2br(esc($contrato['observaciones'] ?? '')) ?></p>

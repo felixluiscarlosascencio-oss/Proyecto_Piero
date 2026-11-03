@@ -20,6 +20,9 @@ class CotizacionModel extends Model
     
     protected $allowedFields    = [
         'nombre_colegio',
+        'nombre_seccion',
+        'persona_encargada',
+        'telefono_contacto',
         'cantidad_estudiantes',
         'servicios_json',
         'precio_unitario',

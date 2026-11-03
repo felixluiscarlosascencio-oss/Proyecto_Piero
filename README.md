@@ -25,19 +25,37 @@ servidor web debe apuntar a `public/`.
 El cotizador público persiste cada solicitud en `solicitudes_cotizacion` y
 prepara un mensaje estructurado de WhatsApp para que el cliente lo envíe al
 número comercial configurado en `app/Helpers/contacto_helper.php`.
+El formulario solicita institución, promoción/sección, alumnos, persona
+encargada, teléfono y servicios. La validación del servidor incluye Google
+reCAPTCHA v2, un campo trampa y una lista básica de lenguaje no permitido.
+Configura `RECAPTCHA_SITE_KEY` y `RECAPTCHA_SECRET_KEY` en el entorno de PHP
+antes de habilitar solicitudes públicas; sin ambas claves el formulario queda
+deshabilitado y el servidor rechaza los envíos.
+
+El catálogo público y las selecciones del panel usan `productos_servicios`.
+Configura `precio_unitario` para cada servicio: los registros iniciales quedan
+en cero porque no se deben asignar precios comerciales no confirmados. La
+descripción ampliada se almacena en `detalle_largo` y la galería en
+`galeria_json` como una lista de rutas de imágenes locales bajo `public/`.
 
 El panel requiere autenticación y está disponible en `/admin/cotizaciones`.
-El administrador también puede crear cotizaciones desde el panel. Los estados de
-cada cotización son:
+El administrador también puede crear cotizaciones desde el panel usando los
+mismos datos y catálogo que el formulario público. Las cotizaciones no se
+editan: solo se pueden ver y eliminar, además de iniciar una transición
+comercial. Los estados de cada cotización son:
 
 1. `solicitud`: recibida y pendiente de revisión.
-2. `aprobada_admin`: precios revisados; permite configurar la vigencia.
+2. `aprobada_admin`: creada por el administrador; permite configurar la vigencia.
 3. `pendiente`: cotización vigente hasta `vence_en`; el administrador puede
   descargar el PDF o confirmar al cliente.
 4. `aprobado`: confirmada y vinculada a un contrato.
 
-La vigencia se activa con un plazo de 1 a 365 días. Al confirmar una cotización
-vigente se crea un registro en `contratos`, vinculado mediante `cotizacion_id`.
+La vigencia se activa con un plazo de 1 a 365 días desde el detalle de la
+cotización. La acción "Pasar a Contrato" crea un registro en `contratos`,
+vinculado mediante `cotizacion_id` y copia los datos de institución, sección,
+encargado, teléfono, alumnos y servicios. El administrador completa los datos
+formales y la agenda desde el contrato. Solo el rol `Dueno` puede eliminar
+contratos.
 Los servicios, las fechas de sesiones y los detalles/cantidades de cuadros se
 guardan como JSON editable en el contrato; la lista de estudiantes permanece en
 `alumnos`.
@@ -47,9 +65,8 @@ administrador puede eliminarlas desde el panel. Las cuentas antiguas, cuyo
 creador queda desconocido, no son eliminables bajo esa regla. La eliminación de
 contratos se reserva al rol `Dueno`.
 
-Los cambios estructurales están en la migración
-`2026-10-30-000001_AddAccountOwnershipAndContractDetails`; aplica las migraciones
-con `php spark migrate` antes de usar las nuevas funciones.
+Los cambios estructurales están en las migraciones recientes; aplica las
+migraciones con `php spark migrate` antes de usar las nuevas funciones.
 
 ARCHIVO .env
 CI_ENVIRONMENT = development

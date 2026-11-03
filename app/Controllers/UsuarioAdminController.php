@@ -9,7 +9,6 @@ class UsuarioAdminController extends BaseController
 {
     private const PERMISSIONS = [
         'cotizaciones.ver'       => 'Ver cotizaciones',
-        'cotizaciones.editar'    => 'Solicitar edición de cotizaciones',
         'cotizaciones.eliminar'  => 'Solicitar eliminación de cotizaciones',
         'contratos.ver'          => 'Ver contratos',
         'contratos.editar'       => 'Editar contratos',

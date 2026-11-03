@@ -21,7 +21,6 @@
 <?php if ($cotizaciones === []): ?>
     <section class="panel empty-state">No hay cotizaciones para mostrar.</section>
 <?php else: ?>
-    <?php $puedeEditar = \App\Libraries\AdminAccess::can('cotizaciones.editar'); ?>
     <?php $puedeEliminar = \App\Libraries\AdminAccess::can('cotizaciones.eliminar'); ?>
     <div class="quote-list">
         <?php foreach ($cotizaciones as $cotizacion): ?>
@@ -36,25 +35,18 @@
                     <span class="status status-<?= esc($cotizacion['estado']) ?>"><?= esc($estadoVisible) ?></span>
                 </div>
                 <p><strong>Estudiantes:</strong> <?= esc($cotizacion['cantidad_estudiantes']) ?></p>
+                <p><strong>Promoción / sección:</strong> <?= esc($cotizacion['nombre_seccion'] ?: 'No especificada') ?></p>
+                <p><strong>Encargado/a:</strong> <?= esc($cotizacion['persona_encargada'] ?: 'Sin dato') ?></p>
+                <p><strong>Teléfono:</strong> <?= esc($cotizacion['telefono_contacto'] ?: 'Sin dato') ?></p>
                 <p><strong>Servicios:</strong> <?= esc(implode(', ', array_column($servicios, 'nombre'))) ?></p>
                 <p><strong>Total estimado:</strong> S/ <?= number_format((float) $cotizacion['total_seccion'], 2) ?></p>
+                <p><strong>Recibida:</strong> <?= esc($cotizacion['created_at'] ? date('d/m/Y H:i', strtotime($cotizacion['created_at'])) : 'Sin fecha') ?></p>
                 <?php if ($cotizacion['vence_en']): ?>
                     <p><strong>Vigente hasta:</strong> <?= esc(date('d/m/Y', strtotime($cotizacion['vence_en']))) ?></p>
                 <?php endif; ?>
                 <div class="action-row">
                     <a class="button secondary compact" href="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/ver') ?>">Ver</a>
-                    <?php if ($cotizacion['estado'] === 'aprobado' && ! empty($cotizacion['contrato_id'])): ?>
-                        <a class="button secondary compact" href="<?= base_url('admin/contratos/' . $cotizacion['contrato_id']) ?>">Abrir contrato</a>
-                    <?php elseif ($cotizacion['estado'] === 'aprobado' && \App\Libraries\AdminAccess::isAdmin()): ?>
-                        <form action="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/confirmar') ?>" method="post">
-                            <?= csrf_field() ?>
-                            <button class="button primary compact" type="submit">Crear contrato</button>
-                        </form>
-                    <?php endif; ?>
-                    <?php if (($puedeEditar && in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin'], true)) || (\App\Libraries\AdminAccess::isAdmin() && $cotizacion['estado'] === 'pendiente')): ?>
-                        <a class="button secondary compact" href="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/editar') ?>">Editar</a>
-                    <?php endif; ?>
-                    <?php if ($puedeEliminar && $cotizacion['estado'] !== 'aprobado'): ?>
+                    <?php if ($puedeEliminar && empty($cotizacion['contrato_id'])): ?>
                         <button class="button danger compact" type="button" data-delete-url="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/eliminar') ?>" data-delete-label="Solicitud #<?= esc($cotizacion['id']) ?>">Eliminar</button>
                     <?php endif; ?>
                 </div>
