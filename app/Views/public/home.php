@@ -130,7 +130,7 @@
             <aside class="cotizador-banner">
                 <span class="banner-icono" aria-hidden="true"><i class="fa-solid fa-camera-retro"></i></span>
                 <p class="banner-etiqueta">Piero Producciones</p>
-                <h3>Momentos únicos.<br>Recuerdos para siempre.</h3>
+                <h3>Momentos únicos y recuerdos para siempre.</h3>
                 <p>Fotografía y video escolar hechos con dedicación para acompañar cada etapa de su promoción.</p>
                 <ul>
                     <li><i class="fa-solid fa-check" aria-hidden="true"></i> Atención personalizada</li>
