@@ -237,12 +237,26 @@ class SolicitudCotizacionController extends BaseController
             return $this->jsonError(503, 'No se pudo validar el formulario. Inténtalo más tarde.');
         }
 
-        $result = json_decode($response->getBody(), true);
-        $requestHost = parse_url('http://' . (string) $this->request->getServer('HTTP_HOST'), PHP_URL_HOST);
-        $captchaHost = is_array($result) ? ($result['hostname'] ?? null) : null;
-        if ($response->getStatusCode() !== 200 || ! is_array($result) || ($result['success'] ?? false) !== true
-            || ! is_string($requestHost) || ! is_string($captchaHost)
-            || strcasecmp($requestHost, $captchaHost) !== 0) {
+        if ($response->getStatusCode() !== 200) {
+            log_message('error', 'Google reCAPTCHA verification returned HTTP status ' . $response->getStatusCode() . '.');
+
+            return $this->jsonError(503, 'No se pudo validar el formulario. Inténtalo más tarde.');
+        }
+
+        try {
+            $result = json_decode($response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $exception) {
+            log_message('error', 'Google reCAPTCHA verification returned invalid JSON: ' . $exception->getMessage());
+
+            return $this->jsonError(503, 'No se pudo validar el formulario. Inténtalo más tarde.');
+        }
+
+        if (! is_array($result) || ($result['success'] ?? false) !== true) {
+            $errorCodes = is_array($result) && is_array($result['error-codes'] ?? null)
+                ? array_filter($result['error-codes'], 'is_string')
+                : [];
+            log_message('error', 'Google reCAPTCHA rejected the token. Error codes: ' . implode(', ', $errorCodes));
+
             return $this->jsonError(422, 'No se pudo validar el reCAPTCHA. Inténtalo nuevamente.');
         }
 

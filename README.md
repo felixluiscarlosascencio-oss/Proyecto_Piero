@@ -68,10 +68,15 @@ contratos se reserva al rol `Dueno`.
 Los cambios estructurales están en las migraciones recientes; aplica las
 migraciones con `php spark migrate` antes de usar las nuevas funciones.
 
+---------------------------------------
 ARCHIVO .env
+
 CI_ENVIRONMENT = development
 
 app.baseURL = 'http://localhost:8080/'
+
+RECAPTCHA_SITE_KEY=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
+RECAPTCHA_SECRET_KEY=6LeIxAcTAAAAAHvR3VRdRM5zFKJZHPdDLW9_Zq7
 
 database.default.hostname = localhost
 database.default.database = database.db
