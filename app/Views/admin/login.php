@@ -25,8 +25,6 @@
         </div>
         
         <div class="hero-content hero-text">
-            <h2>Capturando momentos únicos que perduran</h2>
-            <p>Sistema de gestión interna para cotizaciones, sesiones fotográficas y proyectos escolares de Piero Producciones.</p>
         </div>
 
         <div class="hero-content hero-copy">

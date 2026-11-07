@@ -9,7 +9,7 @@
         <h1>Fotos y videos escolares</h1>
         <p>Capturamos cada etapa de tus estudiantes: promociones, actuaciones y recuerdos que duran toda la vida.</p>
         <div style="margin-top: 25px;">
-            <a class="boton" href="#cotizador">Solicitar Cotización</a>
+            <a class="boton" href="#cotizador">SOLICITAR COTIZACION</a>
         </div>
     </div>
 </section>
@@ -94,37 +94,58 @@
                 <?= csrf_field() ?>
                 <div class="form-grid">
                     <div class="form-group">
+                        <label for="persona_encargada">Tu nombre</label>
+                        <input class="form-control" id="persona_encargada" name="persona_encargada" type="text" maxlength="150" placeholder="Nombre y apellido de quien escribe" autocomplete="name" required>
+                    </div>
+                    <div class="form-group">
                         <label for="nombre_colegio">Nombre de la institución</label>
-                        <input class="form-control" id="nombre_colegio" name="nombre_colegio" type="text" maxlength="150" autocomplete="organization" required>
+                        <input class="form-control" id="nombre_colegio" name="nombre_colegio" type="text" maxlength="150" placeholder="Ej. Colegio Santa Rosa de San Borja" autocomplete="organization" required>
                     </div>
                     <div class="form-group">
-                        <label for="nombre_seccion">Promoción o sección <span>(opcional)</span></label>
-                        <input class="form-control" id="nombre_seccion" name="nombre_seccion" type="text" maxlength="120">
+                        <label for="distrito">Distrito</label>
+                        <input class="form-control" id="distrito" name="distrito" type="text" maxlength="100" placeholder="Ej. San Borja" required>
                     </div>
                     <div class="form-group">
-                        <label for="cantidad_estudiantes">Cantidad de alumnos</label>
-                        <div class="contador-alumnos">
-                            <button type="button" aria-label="Disminuir cantidad" data-step="-1">−</button>
-                            <input class="form-control" id="cantidad_estudiantes" name="cantidad_estudiantes" type="number" min="1" max="10000" value="1" required>
-                            <button type="button" aria-label="Aumentar cantidad" data-step="1">+</button>
-                        </div>
+                        <label for="provincia">Provincia</label>
+                        <input class="form-control" id="provincia" name="provincia" type="text" maxlength="100" placeholder="Ej. Lima" required>
                     </div>
                     <div class="form-group">
-                        <label for="persona_encargada">Persona encargada o tesorera</label>
-                        <input class="form-control" id="persona_encargada" name="persona_encargada" type="text" maxlength="150" autocomplete="name" required>
+                        <label for="cantidad_estudiantes">Cantidad de estudiantes</label>
+                        <input class="form-control" id="cantidad_estudiantes" name="cantidad_estudiantes" type="number" min="1" max="10000" placeholder="Ej. 24" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="nivel">Nivel</label>
+                        <select class="form-control" id="nivel" name="nivel" required>
+                            <option value="" selected disabled>Elige el nivel</option>
+                            <option value="Inicial">Inicial</option>
+                            <option value="Primaria">Primaria</option>
+                            <option value="Secundaria">Secundaria</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="tipo_servicio">Servicio a elegir</label>
+                        <select class="form-control" id="tipo_servicio" name="tipo_servicio" required>
+                            <option value="" selected disabled>Elige un servicio</option>
+                            <option value="Anuario">Anuario</option>
+                            <option value="Cuadros">Cuadros</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="telefono_contacto">Teléfono / WhatsApp</label>
                         <input class="form-control" id="telefono_contacto" name="telefono_contacto" type="tel" maxlength="30" autocomplete="tel" required>
                     </div>
+                    <div class="form-group form-group--wide">
+                        <label for="observaciones">Observaciones o mensaje adicional <span>(opcional)</span></label>
+                        <textarea class="form-control" id="observaciones" name="observaciones" rows="4" maxlength="1000" placeholder="Fechas que tienen en mente, dónde les gustaría la sesión, cualquier detalle que quieras contarnos"></textarea>
+                    </div>
                 </div>
                 <input class="campo-oculto" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
                 <?php if ($recaptchaSiteKey !== ''): ?>
-                    <div class="g-recaptcha" data-sitekey="<?= esc($recaptchaSiteKey) ?>"></div>
+                    <div class="g-recaptcha" data-sitekey="<?= esc(trim((string) env('RECAPTCHA_SITE_KEY'))) ?>"></div>
                 <?php elseif ($recaptchaMisconfigured): ?>
                     <p class="captcha-aviso" role="status">El formulario está temporalmente no disponible. Inténtalo más tarde.</p>
                 <?php endif; ?>
-                <button class="boton" type="submit" <?= $recaptchaMisconfigured ? 'disabled' : '' ?>>Enviar solicitud por WhatsApp</button>
+                <button class="boton" type="submit" <?= $recaptchaMisconfigured ? 'disabled' : '' ?>>Enviar por WhatsApp</button>
                 <p id="solicitud-mensaje" role="status" aria-live="polite"></p>
             </form>
             <aside class="cotizador-banner">
@@ -158,6 +179,7 @@
         event.preventDefault();
         const form = event.currentTarget;
         const message = document.getElementById('solicitud-mensaje');
+        const submitButton = form.querySelector('[type="submit"]');
         const whatsapp = window.open('', '_blank');
 
         if (!whatsapp) {
@@ -165,10 +187,17 @@
             return;
         }
 
+        submitButton.disabled = true;
         try {
+            const formData = new FormData(form);
+            if (window.grecaptcha) {
+                const captchaToken = window.grecaptcha.getResponse();
+                if (captchaToken) formData.set('g-recaptcha-response', captchaToken);
+            }
+
             const response = await fetch(form.action, {
                 method: 'POST',
-                body: new FormData(form),
+                body: formData,
                 headers: { 'Accept': 'application/json' }
             });
             const result = await response.json();
@@ -185,9 +214,12 @@
             form.reset();
             if (csrfField && result.csrf_hash) csrfField.value = result.csrf_hash;
             if (window.grecaptcha) window.grecaptcha.reset();
+            submitButton.disabled = false;
         } catch (error) {
             whatsapp.close();
             message.textContent = error.message || 'Ocurrió un error al enviar la solicitud.';
+            if (window.grecaptcha) window.grecaptcha.reset();
+            submitButton.disabled = false;
         }
     });
 </script>

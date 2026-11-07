@@ -23,10 +23,14 @@ class SolicitudCotizacionController extends BaseController
 
         $datos = [
             'nombre_colegio'       => $this->postString('nombre_colegio'),
-            'nombre_seccion'       => $this->postString('nombre_seccion'),
             'cantidad_estudiantes' => $this->postString('cantidad_estudiantes'),
             'persona_encargada'    => $this->postString('persona_encargada'),
             'telefono_contacto'    => $this->postString('telefono_contacto'),
+            'distrito'             => $this->postString('distrito'),
+            'provincia'            => $this->postString('provincia'),
+            'nivel'                => $this->postString('nivel'),
+            'tipo_servicio'        => $this->postString('tipo_servicio'),
+            'observaciones'        => $this->postString('observaciones'),
         ];
         foreach ($datos as $value) {
             if (! mb_check_encoding($value, 'UTF-8')) {
@@ -37,10 +41,14 @@ class SolicitudCotizacionController extends BaseController
         $validation = service('validation');
         $validation->setRules([
             'nombre_colegio'       => 'required|string|max_length[150]',
-            'nombre_seccion'       => 'permit_empty|string|max_length[120]',
             'cantidad_estudiantes' => 'required|integer|greater_than[0]|less_than_equal_to[10000]',
             'persona_encargada'    => 'required|string|max_length[150]',
             'telefono_contacto'    => 'required|string|max_length[30]',
+            'distrito'             => 'required|string|max_length[100]',
+            'provincia'            => 'required|string|max_length[100]',
+            'nivel'                => 'required|in_list[Inicial,Primaria,Secundaria]',
+            'tipo_servicio'        => 'required|in_list[Anuario,Cuadros]',
+            'observaciones'        => 'permit_empty|string|max_length[1000]',
         ]);
 
         if (! $validation->run($datos)) {
@@ -51,7 +59,7 @@ class SolicitudCotizacionController extends BaseController
             return $this->jsonError(422, 'Ingresa un teléfono o WhatsApp válido.');
         }
 
-        foreach (['nombre_colegio', 'nombre_seccion', 'persona_encargada'] as $campo) {
+        foreach (['nombre_colegio', 'persona_encargada', 'distrito', 'provincia', 'observaciones'] as $campo) {
             if ($this->contienePalabraProhibida($datos[$campo])) {
                 return $this->jsonError(422, 'La solicitud contiene lenguaje no permitido.');
             }
@@ -78,7 +86,7 @@ class SolicitudCotizacionController extends BaseController
         try {
             $id = $model->insert([
                 'nombre_colegio'       => $datos['nombre_colegio'],
-                'nombre_seccion'       => $datos['nombre_seccion'] !== '' ? $datos['nombre_seccion'] : null,
+                'nombre_seccion'       => null,
                 'persona_encargada'    => $datos['persona_encargada'],
                 'telefono_contacto'    => $datos['telefono_contacto'],
                 'cantidad_estudiantes' => $cantidad,
@@ -103,12 +111,18 @@ class SolicitudCotizacionController extends BaseController
             'Hola, deseo solicitar una cotización de Piero Producciones.',
             'Solicitud #' . $id,
             'Institución: ' . $datos['nombre_colegio'],
-            'Promoción/sección: ' . ($datos['nombre_seccion'] ?: 'No especificada'),
+            'Distrito: ' . $datos['distrito'],
+            'Provincia: ' . $datos['provincia'],
+            'Nivel: ' . $datos['nivel'],
+            'Servicio solicitado: ' . $datos['tipo_servicio'],
             'Alumnos: ' . $cantidad,
             'Encargado/a: ' . $datos['persona_encargada'],
             'Teléfono: ' . $datos['telefono_contacto'],
             'Servicios: ' . implode(', ', array_column($servicios, 'nombre')),
         ]);
+        if ($datos['observaciones'] !== '') {
+            $mensaje .= "\nObservaciones: " . $datos['observaciones'];
+        }
 
         helper('contacto');
 
@@ -251,13 +265,26 @@ class SolicitudCotizacionController extends BaseController
             return $this->jsonError(503, 'No se pudo validar el formulario. Inténtalo más tarde.');
         }
 
-        if (! is_array($result) || ($result['success'] ?? false) !== true) {
-            $errorCodes = is_array($result) && is_array($result['error-codes'] ?? null)
+        if (! is_array($result)) {
+            log_message('error', 'Google reCAPTCHA returned an unexpected response.');
+
+            return $this->jsonError(503, 'No se pudo interpretar la respuesta del reCAPTCHA. Inténtalo más tarde.');
+        }
+
+        $errorCodes = is_array($result['error-codes'] ?? null)
                 ? array_filter($result['error-codes'], 'is_string')
                 : [];
+
+        if (array_intersect(['missing-input-secret', 'invalid-input-secret'], $errorCodes) !== []) {
+            log_message('error', 'Google reCAPTCHA secret key was rejected. Error codes: ' . implode(', ', $errorCodes));
+
+            return $this->jsonError(503, 'La clave secreta de reCAPTCHA no fue aceptada. Revisa la configuración del servidor.');
+        }
+
+        if (($result['success'] ?? false) !== true) {
             log_message('error', 'Google reCAPTCHA rejected the token. Error codes: ' . implode(', ', $errorCodes));
 
-            return $this->jsonError(422, 'No se pudo validar el reCAPTCHA. Inténtalo nuevamente.');
+            return $this->jsonError(422, 'El reCAPTCHA venció o no se pudo validar. Marca la casilla nuevamente e inténtalo otra vez.');
         }
 
         return null;
