@@ -396,13 +396,13 @@ class CotizacionController extends BaseController
     private function catalogoServicios(): array
     {
         return (new ServicioModel())
-            ->select('id, nombre_item')
+            ->select('id, nombre_item, descripcion, precio_interno')
             ->orderBy('nombre_item', 'ASC')
             ->findAll();
     }
 
     /**
-     * @return list<array{servicio_id: int, nombre: string, precio_unitario: float}>
+     * @return list<array{servicio_id: int, nombre: string, descripcion: string, precio_unitario: float}>
      */
     private function serviciosSeleccionados($input, mixed $preciosInput): array
     {
@@ -424,7 +424,7 @@ class CotizacionController extends BaseController
         }
 
         $serviciosCatalogo = (new ServicioModel())
-            ->select('id, nombre_item')
+            ->select('id, nombre_item, descripcion')
             ->whereIn('id', $ids)
             ->findAll();
         if (count($serviciosCatalogo) !== count($ids)) {
@@ -440,6 +440,7 @@ class CotizacionController extends BaseController
             $servicios[] = [
                 'servicio_id'     => (int) $servicio['id'],
                 'nombre'          => (string) $servicio['nombre_item'],
+                'descripcion'     => (string) ($servicio['descripcion'] ?? ''),
                 'precio_unitario' => round((float) $precio, 2),
             ];
         }
