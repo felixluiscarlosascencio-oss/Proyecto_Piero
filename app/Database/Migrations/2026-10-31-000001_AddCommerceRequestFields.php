@@ -22,80 +22,74 @@ class AddCommerceRequestFields extends Migration
         ]);
         $this->ensureUniqueQuoteContract();
 
-        if (! $this->db->tableExists('productos_servicios')) {
+        if ($this->db->tableExists('productos_servicios') && ! $this->db->tableExists('servicios')) {
+            $this->forge->renameTable('productos_servicios', 'servicios');
+        } elseif ($this->db->tableExists('productos_servicios') && $this->db->tableExists('servicios')) {
+            throw new \RuntimeException('Both service catalog tables exist before AddCommerceRequestFields.');
+        }
+
+        if (! $this->db->tableExists('servicios')) {
             $this->forge->addField([
-                'id'               => ['type' => 'INT', 'unsigned' => true, 'auto_increment' => true],
-                'nombre_item'      => ['type' => 'VARCHAR', 'constraint' => 100],
-                'tipo'             => ['type' => 'VARCHAR', 'constraint' => 40, 'default' => 'Servicio Adicional'],
-                'descripcion'      => ['type' => 'TEXT', 'null' => true],
-                'detalle_largo'    => ['type' => 'TEXT', 'null' => true],
-                'precio_unitario'  => ['type' => 'DECIMAL', 'constraint' => '10,2', 'default' => 0],
-                'estado'           => ['type' => 'BOOLEAN', 'default' => true],
-                'galeria_json'     => ['type' => 'TEXT', 'null' => true],
-                'creado_en'        => ['type' => 'DATETIME', 'null' => true],
+                'id'                 => ['type' => 'INT', 'unsigned' => true, 'auto_increment' => true],
+                'nombre_item'        => ['type' => 'VARCHAR', 'constraint' => 100],
+                'descripcion'        => ['type' => 'TEXT', 'null' => true],
+                'detalle_largo'      => ['type' => 'TEXT', 'null' => true],
+                'galeria_json'       => ['type' => 'TEXT', 'null' => true],
+                'etiqueta_destacada' => ['type' => 'VARCHAR', 'constraint' => 100, 'null' => true],
+                'precio_interno'     => ['type' => 'DECIMAL', 'constraint' => '10,2', 'default' => 0],
             ]);
             $this->forge->addKey('id', true);
-            $this->forge->createTable('productos_servicios');
+            $this->forge->createTable('servicios');
         } else {
-            $this->addColumns('productos_servicios', [
-                'detalle_largo' => ['type' => 'TEXT', 'null' => true],
-                'galeria_json'  => ['type' => 'TEXT', 'null' => true],
+            $this->addColumns('servicios', [
+                'detalle_largo'      => ['type' => 'TEXT', 'null' => true],
+                'galeria_json'       => ['type' => 'TEXT', 'null' => true],
+                'etiqueta_destacada' => ['type' => 'VARCHAR', 'constraint' => 100, 'null' => true],
+                'precio_interno'     => ['type' => 'DECIMAL', 'constraint' => '10,2', 'default' => 0],
             ]);
         }
 
-        if ($this->db->tableExists('productos_servicios')
-            && $this->db->table('productos_servicios')->countAllResults() === 0) {
-            $now = date('Y-m-d H:i:s');
-            $this->db->table('productos_servicios')->insertBatch([
+        if ($this->db->table('servicios')->countAllResults() === 0) {
+            $this->db->table('servicios')->insertBatch([
                 [
                     'nombre_item' => 'Paquete Base Anuario',
-                    'tipo' => 'Paquete Base',
                     'descripcion' => 'Servicio base para preparar recuerdos de la promoción.',
                     'detalle_largo' => 'La cobertura, el contenido y los acabados del anuario se coordinan con la institución al preparar la cotización.',
-                    'precio_unitario' => 0,
-                    'estado' => 1,
                     'galeria_json' => '[]',
-                    'creado_en' => $now,
+                    'etiqueta_destacada' => null,
+                    'precio_interno' => 0,
                 ],
                 [
                     'nombre_item' => 'Sesión de Exteriores y Drone',
-                    'tipo' => 'Servicio Adicional',
                     'descripcion' => 'Sesión fotográfica de la promoción en exteriores.',
                     'detalle_largo' => 'La locación, disponibilidad de tomas aéreas y condiciones de la sesión se coordinan con la institución.',
-                    'precio_unitario' => 0,
-                    'estado' => 1,
                     'galeria_json' => '[]',
-                    'creado_en' => $now,
+                    'etiqueta_destacada' => null,
+                    'precio_interno' => 0,
                 ],
                 [
                     'nombre_item' => 'Cuadro Retrato de Graduación',
-                    'tipo' => 'Servicio Adicional',
                     'descripcion' => 'Retrato de graduación con acabado por definir.',
                     'detalle_largo' => 'La presentación, las medidas y el acabado se confirman con la institución al preparar la cotización.',
-                    'precio_unitario' => 0,
-                    'estado' => 1,
                     'galeria_json' => '[]',
-                    'creado_en' => $now,
+                    'etiqueta_destacada' => null,
+                    'precio_interno' => 0,
                 ],
                 [
                     'nombre_item' => 'Cuadro Giratorio de Graduación',
-                    'tipo' => 'Servicio Adicional',
                     'descripcion' => 'Cuadro decorativo giratorio para recordar la graduación.',
                     'detalle_largo' => 'Producto decorativo de graduación con diseño giratorio. Los acabados y medidas se confirman al preparar la cotización.',
-                    'precio_unitario' => 0,
-                    'estado' => 1,
                     'galeria_json' => '[]',
-                    'creado_en' => $now,
+                    'etiqueta_destacada' => null,
+                    'precio_interno' => 0,
                 ],
                 [
                     'nombre_item' => 'Cuadro de Graduación',
-                    'tipo' => 'Servicio Adicional',
                     'descripcion' => 'Cuadro conmemorativo de la promoción.',
                     'detalle_largo' => 'Cuadro conmemorativo personalizado para la promoción. Las medidas y acabados se confirman al preparar la cotización.',
-                    'precio_unitario' => 0,
-                    'estado' => 1,
                     'galeria_json' => '[]',
-                    'creado_en' => $now,
+                    'etiqueta_destacada' => null,
+                    'precio_interno' => 0,
                 ],
             ]);
         }
@@ -115,7 +109,8 @@ class AddCommerceRequestFields extends Migration
             'telefono_contacto',
         ]);
         $this->dropUniqueQuoteContract();
-        $this->dropColumns('productos_servicios', ['detalle_largo', 'galeria_json']);
+        $catalogo = $this->db->tableExists('servicios') ? 'servicios' : 'productos_servicios';
+        $this->dropColumns($catalogo, ['detalle_largo', 'galeria_json']);
     }
 
     /**

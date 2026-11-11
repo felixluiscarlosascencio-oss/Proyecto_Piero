@@ -20,6 +20,7 @@
                 <a href="<?= base_url('admin/cotizaciones') ?>">Cotizaciones</a>
                 <a href="<?= base_url('admin/cotizaciones/vigentes') ?>">Cotizaciones vigentes</a>
                 <?php if (in_array(session()->get('rol'), ['Dueno', 'Admin'], true)): ?>
+                    <a href="<?= base_url('admin/servicios') ?>">Servicios</a>
                     <a href="<?= base_url('admin/usuarios') ?>">Crear usuarios</a>
                     <a href="<?= base_url('admin/solicitudes') ?>">Solicitudes del equipo</a>
                 <?php endif; ?>

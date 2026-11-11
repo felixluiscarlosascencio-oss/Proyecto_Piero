@@ -39,6 +39,21 @@ $puedeEliminar = \App\Libraries\AdminAccess::isAdmin() || \App\Libraries\AdminAc
             <?php endforeach; ?>
         </ul>
     <?php endif; ?>
+    <?php if ($administrador && in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin'], true) && $cotizacion['servicios'] !== []): ?>
+        <form class="quote-form" action="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/precios') ?>" method="post">
+            <?= csrf_field() ?>
+            <h3>Precios de cotización (independientes del precio interno)</h3>
+            <div class="service-selection">
+                <?php foreach ($cotizacion['servicios'] as $indice => $servicio): ?>
+                    <label class="service-selection-row">
+                        <span><?= esc($servicio['nombre'] ?? '') ?></span>
+                        <input name="precios[<?= (int) $indice ?>]" type="number" min="0" max="9999999999.99" step="0.01" value="<?= esc(old('precios.' . $indice, $servicio['precio_unitario'] ?? '0.00')) ?>" required>
+                    </label>
+                <?php endforeach; ?>
+            </div>
+            <button class="button primary" type="submit">Guardar precios</button>
+        </form>
+    <?php endif; ?>
     <?php if ($cotizacion['vence_en']): ?>
         <p><strong>Vigente hasta:</strong> <?= esc(date('d/m/Y', strtotime($cotizacion['vence_en']))) ?></p>
     <?php endif; ?>
@@ -75,7 +90,7 @@ $puedeEliminar = \App\Libraries\AdminAccess::isAdmin() || \App\Libraries\AdminAc
         <?php endif; ?>
     </div>
     <?php if ($administrador && in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin'], true) && (float) $cotizacion['total_seccion'] <= 0): ?>
-        <p class="alert error">La vigencia requiere que el precio total sea mayor que cero. Configura los precios del catálogo.</p>
+        <p class="alert error">La vigencia requiere un precio total mayor que cero. Configura los precios de cotización.</p>
     <?php endif; ?>
 </section>
 

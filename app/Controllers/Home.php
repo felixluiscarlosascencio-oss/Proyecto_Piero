@@ -2,7 +2,7 @@
 
 namespace App\Controllers;
 
-use App\Models\ProductoServicioModel;
+use App\Models\ServicioModel;
 
 class Home extends BaseController
 {
@@ -14,8 +14,8 @@ class Home extends BaseController
         $recaptchaMisconfigured = ($recaptchaSiteKey !== '') !== ($recaptchaSecretKey !== '');
 
         return view('public/home', [
-            'servicios' => (new ProductoServicioModel())
-                ->where('estado', 1)
+            'servicios' => (new ServicioModel())
+                ->select('id, nombre_item, descripcion, detalle_largo, galeria_json, etiqueta_destacada')
                 ->orderBy('nombre_item', 'ASC')
                 ->findAll(),
             'recaptchaSiteKey' => $recaptchaConfigured ? $recaptchaSiteKey : '',

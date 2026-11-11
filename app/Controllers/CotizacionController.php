@@ -4,7 +4,7 @@ namespace App\Controllers;
 
 use App\Libraries\AdminAccess;
 use App\Models\CotizacionModel;
-use App\Models\ProductoServicioModel;
+use App\Models\ServicioModel;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Throwable;
@@ -88,7 +88,10 @@ class CotizacionController extends BaseController
             return redirect()->back()->withInput()->with('error', 'Revisa la institución, promoción, cantidad, persona encargada y teléfono.');
         }
 
-        $servicios = $this->serviciosSeleccionados($this->request->getPost('servicios'));
+        $servicios = $this->serviciosSeleccionados(
+            $this->request->getPost('servicios'),
+            $this->request->getPost('precios')
+        );
         if ($servicios === []) {
             return redirect()->back()->withInput()->with('error', 'Selecciona al menos un servicio disponible.');
         }
@@ -153,6 +156,55 @@ class CotizacionController extends BaseController
         ]);
     }
 
+    public function actualizarPrecios(int $id)
+    {
+        if (! AdminAccess::isAdmin()) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo el administrador puede definir los precios de cotización.');
+        }
+
+        $model = new CotizacionModel();
+        $cotizacion = $model->find($id);
+        if ($cotizacion === null || ! in_array($cotizacion['estado'], [CotizacionModel::ESTADO_SOLICITUD, CotizacionModel::ESTADO_APROBADA_ADMIN], true)) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se pueden actualizar los precios de esta cotización.');
+        }
+
+        $servicios = json_decode($cotizacion['servicios_json'], true);
+        $precios = $this->request->getPost('precios');
+        if (! is_array($servicios) || $servicios === [] || ! is_array($precios)) {
+            return redirect()->back()->withInput()->with('error', 'No se pudieron leer los servicios y precios ingresados.');
+        }
+
+        $precioUnitario = 0.0;
+        foreach ($servicios as $indice => &$servicio) {
+            $precio = $precios[$indice] ?? null;
+            if (! is_array($servicio) || ! is_numeric($precio) || (float) $precio < 0 || (float) $precio > 9999999999.99) {
+                unset($servicio);
+
+                return redirect()->back()->withInput()->with('error', 'Ingresa un precio válido para cada servicio.');
+            }
+            $servicio['precio_unitario'] = round((float) $precio, 2);
+            $precioUnitario += $servicio['precio_unitario'];
+        }
+        unset($servicio);
+
+        $total = round($precioUnitario * (int) $cotizacion['cantidad_estudiantes'], 2);
+        if ($precioUnitario > 9999999999.99 || $total > 99999999.99) {
+            return redirect()->back()->withInput()->with('error', 'El total de la cotización supera el máximo permitido.');
+        }
+
+        if (! $model->update($id, [
+            'servicios_json'  => json_encode($servicios, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+            'precio_unitario' => $precioUnitario,
+            'total_seccion'   => $total,
+        ])) {
+            log_message('error', 'Failed to update prices for quote #' . $id . ': ' . json_encode($model->errors()));
+
+            return redirect()->back()->with('error', 'No se pudieron guardar los precios de la cotización.');
+        }
+
+        return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))->with('mensaje', 'Precios de cotización actualizados.');
+    }
+
     public function eliminar(int $id)
     {
         if (! AdminAccess::isAdmin() && ! AdminAccess::can('cotizaciones.eliminar')) {
@@ -204,7 +256,7 @@ class CotizacionController extends BaseController
         }
         if ((float) $cotizacion['total_seccion'] <= 0 || (float) $cotizacion['total_seccion'] > 99999999.99) {
             return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
-                ->with('error', 'Configura precios mayores que cero en el catálogo antes de activar la cotización.');
+                ->with('error', 'Configura los precios de cotización antes de activar esta cotización.');
         }
 
         $diasVigencia = filter_var($this->request->getPost('dias_vigencia'), FILTER_VALIDATE_INT);
@@ -343,16 +395,16 @@ class CotizacionController extends BaseController
      */
     private function catalogoServicios(): array
     {
-        return (new ProductoServicioModel())
-            ->where('estado', 1)
+        return (new ServicioModel())
+            ->select('id, nombre_item')
             ->orderBy('nombre_item', 'ASC')
             ->findAll();
     }
 
     /**
-     * @return list<array{nombre: string, precio_unitario: float}>
+     * @return list<array{servicio_id: int, nombre: string, precio_unitario: float}>
      */
-    private function serviciosSeleccionados($input): array
+    private function serviciosSeleccionados($input, mixed $preciosInput): array
     {
         if (! is_array($input)) {
             return [];
@@ -367,12 +419,12 @@ class CotizacionController extends BaseController
             $ids[] = $id;
         }
         $ids = array_values(array_unique($ids));
-        if ($ids === []) {
+        if ($ids === [] || ! is_array($preciosInput)) {
             return [];
         }
 
-        $serviciosCatalogo = (new ProductoServicioModel())
-            ->where('estado', 1)
+        $serviciosCatalogo = (new ServicioModel())
+            ->select('id, nombre_item')
             ->whereIn('id', $ids)
             ->findAll();
         if (count($serviciosCatalogo) !== count($ids)) {
@@ -381,13 +433,14 @@ class CotizacionController extends BaseController
 
         $servicios = [];
         foreach ($serviciosCatalogo as $servicio) {
-            $precio = (float) $servicio['precio_unitario'];
-            if ($precio < 0 || $precio > 9999999999.99) {
+            $precio = $preciosInput[$servicio['id']] ?? null;
+            if (! is_numeric($precio) || (float) $precio < 0 || (float) $precio > 9999999999.99) {
                 return [];
             }
             $servicios[] = [
+                'servicio_id'     => (int) $servicio['id'],
                 'nombre'          => (string) $servicio['nombre_item'],
-                'precio_unitario' => round($precio, 2),
+                'precio_unitario' => round((float) $precio, 2),
             ];
         }
 

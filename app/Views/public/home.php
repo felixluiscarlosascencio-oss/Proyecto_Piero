@@ -28,12 +28,11 @@
                     ?>
                     <article class="tarjeta servicio-card">
                         <h3><?= esc($servicio['nombre_item']) ?></h3>
+                        <?php if (! empty($servicio['etiqueta_destacada'])): ?>
+                            <span class="servicio-etiqueta"><?= esc($servicio['etiqueta_destacada']) ?></span>
+                        <?php endif; ?>
                         <p><?= esc($servicio['descripcion'] ?: 'Servicio fotográfico para promociones escolares.') ?></p>
-                        <p class="servicio-precio">
-                            <?= (float) $servicio['precio_unitario'] > 0
-                                ? 'S/ ' . number_format((float) $servicio['precio_unitario'], 2) . ' por alumno'
-                                : 'Precio a consultar' ?>
-                        </p>
+                        <p class="servicio-precio">Precio sujeto a cotización personalizada</p>
                         <label class="servicio-seleccion">
                             <input type="checkbox" name="servicios[]" value="<?= esc($servicio['id']) ?>" form="solicitud-cotizacion">
                             <span>Incluir en mi solicitud</span>
@@ -61,6 +60,9 @@
                             </div>
                             <div class="modal-body">
                                 <p><?= nl2br(esc($servicio['detalle_largo'] ?: $servicio['descripcion'] ?: 'Servicio fotográfico para promociones escolares.')) ?></p>
+                                <?php if (! empty($servicio['etiqueta_destacada'])): ?>
+                                    <p class="servicio-modal-etiqueta"><?= esc($servicio['etiqueta_destacada']) ?></p>
+                                <?php endif; ?>
                                 <?php if ($galeria !== []): ?>
                                     <div class="servicio-galeria">
                                         <?php foreach ($galeria as $imagen): ?>

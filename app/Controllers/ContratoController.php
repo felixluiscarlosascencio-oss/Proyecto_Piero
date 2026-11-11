@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Libraries\AdminAccess;
+use App\Models\ServicioModel;
 use Config\Database;
 use Throwable;
 
@@ -37,7 +38,43 @@ class ContratoController extends BaseController
             $contrato[$detalle] = is_array($datos) ? $datos : [];
         }
 
-        return view('admin/contratos/editar', ['contrato' => $contrato, 'alumnos' => $alumnos]);
+        $costoInternoEstimado = null;
+        if (AdminAccess::isAdmin()) {
+            $catalogo = (new ServicioModel())
+                ->select('id, nombre_item, precio_interno')
+                ->findAll();
+            $porId = [];
+            $porNombre = [];
+            foreach ($catalogo as $servicioCatalogo) {
+                $porId[(int) $servicioCatalogo['id']] = (float) $servicioCatalogo['precio_interno'];
+                $porNombre[(string) $servicioCatalogo['nombre_item']] = (float) $servicioCatalogo['precio_interno'];
+            }
+
+            $costoUnitario = 0.0;
+            $serviciosVinculados = 0;
+            foreach ($contrato['servicios'] as $servicio) {
+                if (! is_array($servicio)) {
+                    continue;
+                }
+                $servicioId = filter_var($servicio['servicio_id'] ?? null, FILTER_VALIDATE_INT);
+                $costo = $servicioId !== false && isset($porId[$servicioId])
+                    ? $porId[$servicioId]
+                    : ($porNombre[(string) ($servicio['nombre'] ?? '')] ?? null);
+                if ($costo !== null) {
+                    $costoUnitario += $costo;
+                    $serviciosVinculados++;
+                }
+            }
+            if ($serviciosVinculados > 0) {
+                $costoInternoEstimado = round($costoUnitario * (int) $contrato['cant_alumnos_inicial'], 2);
+            }
+        }
+
+        return view('admin/contratos/editar', [
+            'contrato'              => $contrato,
+            'alumnos'               => $alumnos,
+            'costoInternoEstimado'  => $costoInternoEstimado,
+        ]);
     }
 
     public function actualizar(int $id)
@@ -84,6 +121,26 @@ class ContratoController extends BaseController
             return redirect()->back()->withInput()->with('error', 'Revisa los servicios, fechas de sesiones y detalles de cuadros.');
         }
 
+        $idsServicioCatalogo = [];
+        foreach ($serviciosInput as $servicioInput) {
+            if (! is_array($servicioInput)) {
+                continue;
+            }
+            $servicioId = filter_var($servicioInput['servicio_id'] ?? null, FILTER_VALIDATE_INT);
+            if ($servicioId !== false && $servicioId > 0) {
+                $idsServicioCatalogo[] = $servicioId;
+            }
+        }
+        $nombresCatalogo = [];
+        if ($idsServicioCatalogo !== []) {
+            foreach ((new ServicioModel())
+                ->select('id, nombre_item')
+                ->whereIn('id', array_values(array_unique($idsServicioCatalogo)))
+                ->findAll() as $servicioCatalogo) {
+                $nombresCatalogo[(int) $servicioCatalogo['id']] = (string) $servicioCatalogo['nombre_item'];
+            }
+        }
+
         foreach ($serviciosInput as $servicio) {
             if (! is_array($servicio)) {
                 continue;
@@ -96,7 +153,15 @@ class ContratoController extends BaseController
             if ($nombre === '' || mb_strlen($nombre) > 120 || ! is_numeric($precio) || (float) $precio < 0 || (float) $precio > 9999999999.99) {
                 return redirect()->back()->withInput()->with('error', 'Revisa el nombre y precio de los servicios.');
             }
-            $servicios[] = ['nombre' => $nombre, 'precio_unitario' => round((float) $precio, 2)];
+            $servicioId = filter_var($servicio['servicio_id'] ?? null, FILTER_VALIDATE_INT);
+            if ($servicioId === false || $servicioId < 1 || ($nombresCatalogo[$servicioId] ?? null) !== $nombre) {
+                $servicioId = null;
+            }
+            $servicios[] = [
+                'servicio_id'     => $servicioId,
+                'nombre'          => $nombre,
+                'precio_unitario' => round((float) $precio, 2),
+            ];
         }
         if ($servicios === []) {
             return redirect()->back()->withInput()->with('error', 'El contrato debe incluir al menos un servicio.');

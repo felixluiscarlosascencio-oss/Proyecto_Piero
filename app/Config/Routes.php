@@ -18,6 +18,7 @@ $routes->group('admin', ['filter' => 'auth'], static function ($routes): void {
     $routes->get('cotizaciones/(:num)/ver', 'CotizacionController::ver/$1');
     $routes->get('cotizaciones/(:num)', 'CotizacionController::ver/$1');
     $routes->post('cotizaciones/(:num)/eliminar', 'CotizacionController::eliminar/$1');
+    $routes->post('cotizaciones/(:num)/precios', 'CotizacionController::actualizarPrecios/$1', ['filter' => 'auth:admin']);
     $routes->post('cotizaciones/(:num)/activar', 'CotizacionController::activar/$1', ['filter' => 'auth:admin']);
     $routes->post('cotizaciones/(:num)/contrato', 'CotizacionController::pasarAContrato/$1', ['filter' => 'auth:admin']);
     $routes->post('cotizaciones/(:num)/pdf', 'CotizacionController::descargarPdf/$1', ['filter' => 'auth:admin']);
@@ -30,6 +31,13 @@ $routes->group('admin', ['filter' => 'auth'], static function ($routes): void {
     $routes->get('solicitudes', 'SolicitudAdminController::index', ['filter' => 'auth:admin']);
     $routes->post('solicitudes/(:num)/aprobar', 'SolicitudAdminController::resolver/$1/aprobar', ['filter' => 'auth:admin']);
     $routes->post('solicitudes/(:num)/denegar', 'SolicitudAdminController::resolver/$1/denegar', ['filter' => 'auth:admin']);
+
+    $routes->get('servicios', 'ServicioAdminController::index', ['filter' => 'auth:admin']);
+    $routes->get('servicios/nuevo', 'ServicioAdminController::nuevo', ['filter' => 'auth:admin']);
+    $routes->post('servicios', 'ServicioAdminController::crear', ['filter' => 'auth:admin']);
+    $routes->get('servicios/(:num)/editar', 'ServicioAdminController::editar/$1', ['filter' => 'auth:admin']);
+    $routes->post('servicios/(:num)', 'ServicioAdminController::actualizar/$1', ['filter' => 'auth:admin']);
+    $routes->post('servicios/(:num)/eliminar', 'ServicioAdminController::eliminar/$1', ['filter' => 'auth:admin']);
 
     $routes->get('contratos', 'ContratoController::index');
     $routes->get('contratos/(:num)', 'ContratoController::editar/$1');

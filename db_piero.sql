@@ -49,15 +49,15 @@ CREATE TABLE usuarios (
     FOREIGN KEY (personal_id) REFERENCES personal(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- Catálogo de productos y servicios
-CREATE TABLE productos_servicios (
-    id                INT AUTO_INCREMENT PRIMARY KEY,
-    nombre_item       VARCHAR(100) NOT NULL,
-    tipo              ENUM('Paquete Base','Servicio Adicional') NOT NULL DEFAULT 'Paquete Base',
-    descripcion       TEXT NULL,
-    precio_unitario   DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    estado            BOOLEAN NOT NULL DEFAULT TRUE,
-    creado_en         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+-- Catálogo de servicios
+CREATE TABLE servicios (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    nombre_item         VARCHAR(100) NOT NULL,
+    descripcion         TEXT NULL,
+    detalle_largo       TEXT NULL,
+    galeria_json        TEXT NULL,
+    etiqueta_destacada  VARCHAR(100) NULL,
+    precio_interno      DECIMAL(10,2) NOT NULL DEFAULT 0.00
 ) ENGINE=InnoDB;
 
 -- 2. COTIZACIONES Y CONTRATOS
@@ -92,7 +92,7 @@ CREATE TABLE cotizacion_detalles (
     descuento             DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     subtotal              DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     FOREIGN KEY (cotizacion_id)        REFERENCES cotizaciones(id)        ON DELETE CASCADE,
-    FOREIGN KEY (producto_servicio_id) REFERENCES productos_servicios(id) ON DELETE RESTRICT
+    FOREIGN KEY (producto_servicio_id) REFERENCES servicios(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
 CREATE TABLE contratos (
@@ -161,7 +161,7 @@ CREATE TABLE pedido_detalles (
     observaciones         TEXT NULL,
     FOREIGN KEY (contrato_id)          REFERENCES contratos(id)           ON DELETE RESTRICT,
     FOREIGN KEY (alumno_id)            REFERENCES alumnos(id)             ON DELETE RESTRICT,
-    FOREIGN KEY (producto_servicio_id) REFERENCES productos_servicios(id) ON DELETE RESTRICT
+    FOREIGN KEY (producto_servicio_id) REFERENCES servicios(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
 -- 4. SESIONES Y PRODUCCION

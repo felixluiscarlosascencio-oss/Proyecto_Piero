@@ -13,6 +13,14 @@
 <?php if ($mensaje = session()->getFlashdata('mensaje')): ?><div class="alert success"><?= esc($mensaje) ?></div><?php endif; ?>
 <?php if ($error = session()->getFlashdata('error')): ?><div class="alert error"><?= esc($error) ?></div><?php endif; ?>
 
+<?php if (\App\Libraries\AdminAccess::isAdmin() && $costoInternoEstimado !== null): ?>
+    <section class="panel internal-cost-summary">
+        <h2>Costo interno estimado del contrato</h2>
+        <p>S/ <?= number_format((float) $costoInternoEstimado, 2) ?> para los servicios vinculados al catálogo y la cantidad inicial de alumnos.</p>
+        <small>Dato exclusivo de administración; no forma parte del precio de cotización ni del contrato.</small>
+    </section>
+<?php endif; ?>
+
 <?php if ($puedeEditar): ?>
     <form class="panel quote-form" action="<?= base_url('admin/contratos/' . $contrato['id']) ?>" method="post">
         <?= csrf_field() ?>
@@ -48,6 +56,7 @@
             <?php $servicios = $contrato['servicios'] ?: [['nombre' => '', 'precio_unitario' => 0]]; ?>
             <?php foreach ($servicios as $indice => $servicio): ?>
                 <div class="service-row">
+                    <input name="servicios[<?= esc($indice) ?>][servicio_id]" type="hidden" value="<?= esc($servicio['servicio_id'] ?? '') ?>">
                     <label>Servicio
                         <input name="servicios[<?= esc($indice) ?>][nombre]" maxlength="120" value="<?= esc($servicio['nombre'] ?? '') ?>" required>
                     </label>
@@ -148,6 +157,7 @@
             container.append(row);
         };
         document.getElementById('add-contract-service').addEventListener('click', () => appendDetailRow('contract-services', (index) => `
+            <input name="servicios[${index}][servicio_id]" type="hidden" value="">
             <label>Servicio<input name="servicios[${index}][nombre]" maxlength="120" required></label>
             <label>Precio por estudiante (S/)<input name="servicios[${index}][precio_unitario]" type="number" min="0" step="0.01" value="0" required></label>`));
         document.getElementById('add-contract-session').addEventListener('click', () => appendDetailRow('contract-agenda', (index) => `

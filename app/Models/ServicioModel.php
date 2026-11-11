@@ -4,9 +4,9 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
-class ProductoServicioModel extends Model
+class ServicioModel extends Model
 {
-    protected $table            = 'productos_servicios';
+    protected $table            = 'servicios';
     protected $primaryKey       = 'id';
     protected $useAutoIncrement = true;
     protected $returnType       = 'array';
@@ -15,13 +15,11 @@ class ProductoServicioModel extends Model
 
     protected $allowedFields    = [
         'nombre_item',
-        'tipo',
         'descripcion',
         'detalle_largo',
-        'precio_unitario',
-        'estado',
         'galeria_json',
-        'creado_en',
+        'etiqueta_destacada',
+        'precio_interno',
     ];
 
     protected $useTimestamps = false;

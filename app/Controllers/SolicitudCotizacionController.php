@@ -3,7 +3,7 @@
 namespace App\Controllers;
 
 use App\Models\CotizacionModel;
-use App\Models\ProductoServicioModel;
+use App\Models\ServicioModel;
 use Throwable;
 
 class SolicitudCotizacionController extends BaseController
@@ -153,7 +153,7 @@ class SolicitudCotizacionController extends BaseController
     }
 
     /**
-     * @return list<array{nombre: string, precio_unitario: float}>
+     * @return list<array{servicio_id: int, nombre: string, precio_unitario: float}>
      */
     private function serviciosSeleccionados(mixed $input): array
     {
@@ -175,8 +175,8 @@ class SolicitudCotizacionController extends BaseController
             return [];
         }
 
-        $catalogo = (new ProductoServicioModel())
-            ->where('estado', 1)
+        $catalogo = (new ServicioModel())
+            ->select('id, nombre_item')
             ->whereIn('id', $ids)
             ->findAll();
 
@@ -186,13 +186,10 @@ class SolicitudCotizacionController extends BaseController
 
         $servicios = [];
         foreach ($catalogo as $servicio) {
-            $precio = (float) $servicio['precio_unitario'];
-            if ($precio < 0 || $precio > 9999999999.99) {
-                return [];
-            }
             $servicios[] = [
+                'servicio_id'     => (int) $servicio['id'],
                 'nombre'          => (string) $servicio['nombre_item'],
-                'precio_unitario' => round($precio, 2),
+                'precio_unitario' => 0,
             ];
         }
 

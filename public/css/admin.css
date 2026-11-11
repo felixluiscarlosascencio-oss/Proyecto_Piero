@@ -107,6 +107,19 @@ input[type="checkbox"] { accent-color: #111; width: auto; }
 .form-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .form-field { display: grid; gap: 7px; }
 .form-field.full { grid-column: 1 / -1; }
+.service-admin-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.service-admin-card { min-width: 0; overflow-wrap: anywhere; }
+.service-admin-card h2, .service-admin-card p { overflow-wrap: anywhere; word-break: normal; }
+.service-admin-gallery { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); margin: 12px 0; }
+.service-admin-gallery img { aspect-ratio: 1; border-radius: 5px; object-fit: cover; width: 100%; }
+.service-gallery-item { align-items: center; display: grid; gap: 5px; min-width: 0; }
+.service-gallery-item label { align-items: center; display: flex; font-size: 12px; gap: 5px; }
+.service-gallery-item input[type="checkbox"] { width: auto; }
+.service-price-field { color: var(--admin-muted); display: grid; font-size: 12px; gap: 5px; max-width: 240px; min-width: 0; }
+.service-selection-row .service-price-field { grid-column: 1 / -1; max-width: none; }
+.internal-cost-summary { border-left: 5px solid var(--admin-accent); margin-bottom: 18px; }
+.internal-cost-summary small { color: var(--admin-muted); display: block; }
+.form-field textarea { min-height: 110px; resize: vertical; }
 
 /* ---------- Tablas ---------- */
 .data-table { border-collapse: collapse; width: 100%; }

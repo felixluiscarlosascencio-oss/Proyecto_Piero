@@ -44,7 +44,9 @@
                 <label class="service-selection-row">
                     <input type="checkbox" name="servicios[]" value="<?= esc($servicio['id']) ?>" <?= in_array((string) $servicio['id'], $idsSeleccionados, true) ? 'checked' : '' ?>>
                     <span><?= esc($servicio['nombre_item']) ?></span>
-                    <strong><?= (float) $servicio['precio_unitario'] > 0 ? 'S/ ' . number_format((float) $servicio['precio_unitario'], 2) . ' por alumno' : 'Precio a consultar' ?></strong>
+                    <label class="service-price-field">Precio de cotización por alumno (S/)
+                        <input name="precios[<?= esc($servicio['id']) ?>]" type="number" min="0" max="9999999999.99" step="0.01" value="<?= esc(old('precios.' . $servicio['id'], '0.00')) ?>">
+                    </label>
                 </label>
             <?php endforeach; ?>
         </div>
