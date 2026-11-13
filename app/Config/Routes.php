@@ -11,9 +11,14 @@ $routes->post('logout', 'AuthController::logout');
 $routes->post('cotizaciones/solicitar', 'SolicitudCotizacionController::crear');
 
 $routes->group('admin', ['filter' => 'auth'], static function ($routes): void {
+    $routes->get('/', 'DashboardController::index');
+    $routes->get('dashboard', 'DashboardController::index');
+    $routes->get('reportes', 'DashboardController::reportes');
+    $routes->get('buscar', 'DashboardController::buscar');
     $routes->get('cotizaciones', 'CotizacionController::index');
     $routes->get('cotizaciones/vigentes', 'CotizacionController::vigentes');
     $routes->get('cotizaciones/nueva', 'CotizacionController::nueva', ['filter' => 'auth:admin']);
+    $routes->get('cotizaciones/(:num)/duplicar', 'CotizacionController::duplicar/$1', ['filter' => 'auth:admin']);
     $routes->post('cotizaciones/crear', 'CotizacionController::crear', ['filter' => 'auth:admin']);
     $routes->get('cotizaciones/(:num)/ver', 'CotizacionController::ver/$1');
     $routes->get('cotizaciones/(:num)', 'CotizacionController::ver/$1');
@@ -42,5 +47,5 @@ $routes->group('admin', ['filter' => 'auth'], static function ($routes): void {
     $routes->get('contratos', 'ContratoController::index');
     $routes->get('contratos/(:num)', 'ContratoController::editar/$1');
     $routes->post('contratos/(:num)', 'ContratoController::actualizar/$1');
-    $routes->post('contratos/(:num)/eliminar', 'ContratoController::eliminar/$1', ['filter' => 'auth:admin']);
+    $routes->post('contratos/(:num)/ajustes', 'ContratoController::crearAjuste/$1');
 });

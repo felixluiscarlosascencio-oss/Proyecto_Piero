@@ -153,7 +153,7 @@ class SolicitudCotizacionController extends BaseController
     }
 
     /**
-     * @return list<array{servicio_id: int, nombre: string, descripcion: string, precio_unitario: int}>
+     * @return list<array{servicio_id: int, nombre: string, descripcion: string, precio_interno: float, precio_unitario: int}>
      */
     private function serviciosSeleccionados(mixed $input): array
     {
@@ -176,7 +176,7 @@ class SolicitudCotizacionController extends BaseController
         }
 
         $catalogo = (new ServicioModel())
-            ->select('id, nombre_item, descripcion')
+            ->select('id, nombre_item, descripcion, precio_interno')
             ->whereIn('id', $ids)
             ->findAll();
 
@@ -190,6 +190,7 @@ class SolicitudCotizacionController extends BaseController
                 'servicio_id'     => (int) $servicio['id'],
                 'nombre'          => (string) $servicio['nombre_item'],
                 'descripcion'     => (string) ($servicio['descripcion'] ?? ''),
+                'precio_interno'  => (float) $servicio['precio_interno'],
                 'precio_unitario' => 0,
             ];
         }

@@ -4,7 +4,7 @@
 <div class="page-heading">
     <div>
         <h1>Contratos</h1>
-        <p>Consulta los acuerdos y administra sus datos y alumnos.</p>
+        <p>Consulta los contratos originales y su historial de adendas.</p>
     </div>
 </div>
 
@@ -28,10 +28,7 @@
                         <td><span class="status status-<?= $cerrado ? 'denegada' : 'aprobado' ?>"><?= esc($estado) ?></span></td>
                         <td>
                             <div class="inline-actions">
-                                <a class="button secondary compact" href="<?= base_url('admin/contratos/' . $contrato['id']) ?>">Ver / editar</a>
-                                <?php if (\App\Libraries\AdminAccess::isOwner()): ?>
-                                    <button class="button danger compact" type="button" data-delete-url="<?= base_url('admin/contratos/' . $contrato['id'] . '/eliminar') ?>" data-delete-label="contrato <?= esc($contrato['numero_contrato'] ?: '#' . $contrato['id']) ?>">Eliminar</button>
-                                <?php endif; ?>
+                                <a class="button secondary compact" href="<?= base_url('admin/contratos/' . $contrato['id']) ?>">Ver contrato / adendas</a>
                             </div>
                         </td>
                     </tr>
@@ -41,30 +38,4 @@
     </section>
 <?php endif; ?>
 
-<?php if (\App\Libraries\AdminAccess::isOwner()): ?>
-    <dialog id="delete-dialog" aria-labelledby="delete-title">
-        <form id="delete-form" method="post">
-            <?= csrf_field() ?>
-            <h2 id="delete-title">Confirmar eliminación</h2>
-            <p id="delete-message"></p>
-            <div class="dialog-actions">
-                <button class="button secondary" type="button" data-close-dialog>Cancelar</button>
-                <button class="button danger" type="submit">Confirmar eliminación</button>
-            </div>
-        </form>
-    </dialog>
-    <script>
-        const deleteDialog = document.getElementById('delete-dialog');
-        const deleteForm = document.getElementById('delete-form');
-        const deleteMessage = document.getElementById('delete-message');
-        document.querySelectorAll('[data-delete-url]').forEach((button) => {
-            button.addEventListener('click', () => {
-                deleteForm.action = button.dataset.deleteUrl;
-                deleteMessage.textContent = `¿Eliminar ${button.dataset.deleteLabel}?`;
-                deleteDialog.showModal();
-            });
-        });
-        document.querySelector('[data-close-dialog]')?.addEventListener('click', () => deleteDialog.close());
-    </script>
-<?php endif; ?>
 <?= $this->endSection() ?>

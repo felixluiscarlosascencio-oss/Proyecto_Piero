@@ -20,8 +20,8 @@ class CotizacionController extends BaseController
         $cotizaciones = (new CotizacionModel())
             ->select('solicitudes_cotizacion.*, contratos.id AS contrato_id')
             ->join('contratos', 'contratos.cotizacion_id = solicitudes_cotizacion.id', 'left')
-            ->orderBy('solicitudes_cotizacion.created_at', 'DESC')
-            ->orderBy('solicitudes_cotizacion.id', 'DESC')
+            ->orderBy('solicitudes_cotizacion.created_at', 'ASC')
+            ->orderBy('solicitudes_cotizacion.id', 'ASC')
             ->findAll();
 
         return view('admin/cotizaciones/index', [
@@ -43,8 +43,8 @@ class CotizacionController extends BaseController
                 ->where('vence_en', null)
                 ->orWhere('vence_en >=', date('Y-m-d H:i:s'))
             ->groupEnd()
-            ->orderBy('vence_en', 'ASC')
-            ->orderBy('created_at', 'DESC')
+            ->orderBy('created_at', 'ASC')
+            ->orderBy('id', 'ASC')
             ->findAll();
 
         return view('admin/cotizaciones/index', [
@@ -60,7 +60,34 @@ class CotizacionController extends BaseController
             return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo el administrador puede crear cotizaciones directamente.');
         }
 
-        return view('admin/cotizaciones/nueva', ['serviciosCatalogo' => $this->catalogoServicios()]);
+        return view('admin/cotizaciones/nueva', [
+            'serviciosCatalogo' => $this->catalogoServicios(),
+            'duplicada' => null,
+        ]);
+    }
+
+    public function duplicar(int $id)
+    {
+        if (! AdminAccess::isAdmin()) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo el administrador puede duplicar cotizaciones.');
+        }
+
+        $cotizacion = (new CotizacionModel())->find($id);
+        if ($cotizacion === null) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se encontró la cotización que deseas duplicar.');
+        }
+
+        $servicios = json_decode((string) $cotizacion['servicios_json'], true);
+        if (! is_array($servicios) || $servicios === []) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'La cotización original no contiene servicios válidos para duplicar.');
+        }
+
+        $cotizacion['servicios'] = $servicios;
+
+        return view('admin/cotizaciones/nueva', [
+            'serviciosCatalogo' => [],
+            'duplicada' => $cotizacion,
+        ]);
     }
 
     public function crear()
@@ -88,12 +115,21 @@ class CotizacionController extends BaseController
             return redirect()->back()->withInput()->with('error', 'Revisa la institución, promoción, cantidad, persona encargada y teléfono.');
         }
 
-        $servicios = $this->serviciosSeleccionados(
-            $this->request->getPost('servicios'),
-            $this->request->getPost('precios')
-        );
+        $duplicarDe = filter_var($this->request->getPost('duplicar_de'), FILTER_VALIDATE_INT);
+        if ($duplicarDe !== false && $duplicarDe > 0) {
+            $cotizacionOrigen = (new CotizacionModel())->find($duplicarDe);
+            $serviciosOrigen = $cotizacionOrigen === null
+                ? null
+                : json_decode((string) $cotizacionOrigen['servicios_json'], true);
+            $servicios = $this->validarServiciosClonados($serviciosOrigen);
+        } else {
+            $servicios = $this->serviciosSeleccionados(
+                $this->request->getPost('servicios'),
+                $this->request->getPost('precios')
+            );
+        }
         if ($servicios === []) {
-            return redirect()->back()->withInput()->with('error', 'Selecciona al menos un servicio disponible.');
+            return redirect()->back()->withInput()->with('error', 'Selecciona al menos un servicio con precio interno configurado; los precios de cotización no pueden superarlo.');
         }
 
         $cantidad = (int) $datos['cantidad_estudiantes'];
@@ -177,10 +213,17 @@ class CotizacionController extends BaseController
         $precioUnitario = 0.0;
         foreach ($servicios as $indice => &$servicio) {
             $precio = $precios[$indice] ?? null;
-            if (! is_array($servicio) || ! is_numeric($precio) || (float) $precio < 0 || (float) $precio > 9999999999.99) {
+            $precioInterno = is_array($servicio) && is_numeric($servicio['precio_interno'] ?? null)
+                ? (float) $servicio['precio_interno']
+                : null;
+            if (! is_array($servicio)
+                || ! is_numeric($precio)
+                || (float) $precio <= 0
+                || (float) $precio > 9999999999.99
+                || ($precioInterno !== null && ((float) $precioInterno <= 0 || (float) $precio > $precioInterno))) {
                 unset($servicio);
 
-                return redirect()->back()->withInput()->with('error', 'Ingresa un precio válido para cada servicio.');
+                return redirect()->back()->withInput()->with('error', 'Ingresa un precio válido que no supere el precio interno guardado en la cotización.');
             }
             $servicio['precio_unitario'] = round((float) $precio, 2);
             $precioUnitario += $servicio['precio_unitario'];
@@ -424,7 +467,7 @@ class CotizacionController extends BaseController
         }
 
         $serviciosCatalogo = (new ServicioModel())
-            ->select('id, nombre_item, descripcion')
+            ->select('id, nombre_item, descripcion, precio_interno')
             ->whereIn('id', $ids)
             ->findAll();
         if (count($serviciosCatalogo) !== count($ids)) {
@@ -433,19 +476,53 @@ class CotizacionController extends BaseController
 
         $servicios = [];
         foreach ($serviciosCatalogo as $servicio) {
-            $precio = $preciosInput[$servicio['id']] ?? null;
-            if (! is_numeric($precio) || (float) $precio < 0 || (float) $precio > 9999999999.99) {
+            $precio = $preciosInput[$servicio['id']] ?? $servicio['precio_interno'];
+            if ($precio === '') {
+                $precio = $servicio['precio_interno'];
+            }
+            $precioInterno = (float) $servicio['precio_interno'];
+            if (! is_numeric($precio)
+                || (float) $precio <= 0
+                || $precioInterno <= 0
+                || (float) $precio > $precioInterno) {
                 return [];
             }
             $servicios[] = [
                 'servicio_id'     => (int) $servicio['id'],
                 'nombre'          => (string) $servicio['nombre_item'],
                 'descripcion'     => (string) ($servicio['descripcion'] ?? ''),
+                'precio_interno'  => $precioInterno,
                 'precio_unitario' => round((float) $precio, 2),
             ];
         }
 
         return $servicios;
+    }
+
+    /**
+     * @param mixed $servicios
+     * @return list<array<string, mixed>>
+     */
+    private function validarServiciosClonados($servicios): array
+    {
+        if (! is_array($servicios)) {
+            return [];
+        }
+
+        $resultado = [];
+        foreach ($servicios as $servicio) {
+            if (! is_array($servicio)
+                || ! is_string($servicio['nombre'] ?? null)
+                || trim($servicio['nombre']) === ''
+                || ! is_numeric($servicio['precio_unitario'] ?? null)
+                || (float) $servicio['precio_unitario'] < 0
+                || (float) $servicio['precio_unitario'] > 9999999999.99) {
+                return [];
+            }
+            $resultado[] = $servicio;
+        }
+
+        return $resultado;
     }
 
     private function postString(string $field): string

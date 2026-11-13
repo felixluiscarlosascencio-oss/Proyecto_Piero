@@ -10,7 +10,7 @@ class AuthController extends BaseController
     public function login()
     {
         if (session()->get('logged_in')) {
-            return redirect()->to(base_url('admin/cotizaciones'));
+            return redirect()->to(base_url('admin/dashboard'));
         }
 
         return view('admin/login');
@@ -65,7 +65,7 @@ class AuthController extends BaseController
                 ];
                 $session->set($sessionData);
 
-                return redirect()->to(base_url('admin/cotizaciones'));
+                return redirect()->to(base_url('admin/dashboard'));
             }
         }
 

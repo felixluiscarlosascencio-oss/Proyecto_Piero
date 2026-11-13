@@ -1,12 +1,12 @@
 <?= $this->extend('layouts/admin') ?>
 <?= $this->section('titulo') ?>Contrato <?= esc($contrato['numero_contrato'] ?: '#' . $contrato['id']) ?><?= $this->endSection() ?>
 <?= $this->section('contenido') ?>
-<?php $puedeEditar = \App\Libraries\AdminAccess::can('contratos.editar'); ?>
+<?php $puedeCrearAjustes = \App\Libraries\AdminAccess::can('contratos.editar'); ?>
 <div class="page-heading">
     <div>
         <a class="back-link" href="<?= base_url('admin/contratos') ?>">&larr; Volver a contratos</a>
         <h1>Contrato <?= esc($contrato['numero_contrato'] ?: '#' . $contrato['id']) ?></h1>
-        <p>Estado: <?= esc($contrato['estado_contrato'] ?? 'Activo') ?></p>
+        <p>Estado: <?= esc($contrato['estado_contrato'] ?? 'Activo') ?> · Documento original inmutable</p>
     </div>
 </div>
 
@@ -17,155 +17,141 @@
     <section class="panel internal-cost-summary">
         <h2>Costo interno estimado del contrato</h2>
         <p>S/ <?= number_format((float) $costoInternoEstimado, 2) ?> para los servicios vinculados al catálogo y la cantidad inicial de alumnos.</p>
-        <small>Dato exclusivo de administración; no forma parte del precio de cotización ni del contrato.</small>
+        <small>Dato exclusivo de administración; no forma parte del precio ni altera el documento firmado.</small>
     </section>
 <?php endif; ?>
 
-<?php if ($puedeEditar): ?>
-    <form class="panel quote-form" action="<?= base_url('admin/contratos/' . $contrato['id']) ?>" method="post">
-        <?= csrf_field() ?>
-        <h2>Datos del contrato</h2>
-        <div class="form-grid">
-            <label class="form-field full">Nombre de la institución
-                <input name="nombre_colegio" maxlength="150" value="<?= esc(old('nombre_colegio', $contrato['nombre_colegio'] ?? '')) ?>" required>
-            </label>
-            <label class="form-field">Promoción / sección
-                <input name="nombre_seccion" maxlength="120" value="<?= esc(old('nombre_seccion', $contrato['nombre_seccion'] ?? '')) ?>">
-            </label>
-            <label class="form-field">Persona encargada o tesorera
-                <input name="persona_encargada" maxlength="150" value="<?= esc(old('persona_encargada', $contrato['persona_encargada'] ?? '')) ?>" required>
-            </label>
-            <label class="form-field">Teléfono / WhatsApp
-                <input name="telefono_contacto" type="tel" maxlength="30" value="<?= esc(old('telefono_contacto', $contrato['telefono_contacto'] ?? '')) ?>" required>
-            </label>
-            <label class="form-field">Nivel
-                <input name="nivel" maxlength="50" value="<?= esc(old('nivel', $contrato['nivel'] ?? '')) ?>">
-            </label>
-            <label class="form-field">Aula / sección
-                <input name="aula" maxlength="50" value="<?= esc(old('aula', $contrato['aula'] ?? '')) ?>">
-            </label>
-            <label class="form-field">Cantidad inicial de alumnos
-                <input name="cant_alumnos_inicial" type="number" min="1" max="10000" value="<?= esc(old('cant_alumnos_inicial', $contrato['cant_alumnos_inicial'] ?? 1)) ?>" required>
-            </label>
-            <label class="form-field full">Observaciones
-                <textarea name="observaciones" rows="3" maxlength="10000"><?= esc(old('observaciones', $contrato['observaciones'] ?? '')) ?></textarea>
-            </label>
-        </div>
-        <h2>Servicios</h2>
-        <div id="contract-services">
-            <?php $servicios = $contrato['servicios'] ?: [['nombre' => '', 'precio_unitario' => 0]]; ?>
-            <?php foreach ($servicios as $indice => $servicio): ?>
-                <div class="service-row">
-                    <input name="servicios[<?= esc($indice) ?>][servicio_id]" type="hidden" value="<?= esc($servicio['servicio_id'] ?? '') ?>">
-                    <label>Servicio
-                        <input name="servicios[<?= esc($indice) ?>][nombre]" maxlength="120" value="<?= esc($servicio['nombre'] ?? '') ?>" required>
-                    </label>
-                    <label>Precio por estudiante (S/)
-                        <input name="servicios[<?= esc($indice) ?>][precio_unitario]" type="number" min="0" step="0.01" value="<?= esc($servicio['precio_unitario'] ?? 0) ?>" required>
-                    </label>
-                </div>
-            <?php endforeach; ?>
-        </div>
-        <button class="button secondary" id="add-contract-service" type="button">Agregar servicio</button>
+<section class="panel">
+    <h2>Documento original</h2>
+    <dl class="quote-details">
+        <div><dt>Institución</dt><dd><?= esc($contrato['nombre_colegio'] ?? 'Sin especificar') ?></dd></div>
+        <div><dt>Promoción / sección</dt><dd><?= esc($contrato['nombre_seccion'] ?? 'Sin especificar') ?></dd></div>
+        <div><dt>Persona encargada</dt><dd><?= esc($contrato['persona_encargada'] ?? 'Sin especificar') ?></dd></div>
+        <div><dt>Teléfono / WhatsApp</dt><dd><?= esc($contrato['telefono_contacto'] ?? 'Sin especificar') ?></dd></div>
+        <div><dt>Nivel / aula</dt><dd><?= esc(trim(($contrato['nivel'] ?? '') . ' ' . ($contrato['aula'] ?? '')) ?: 'Sin especificar') ?></dd></div>
+        <div><dt>Alumnos iniciales</dt><dd><?= esc($contrato['cant_alumnos_inicial'] ?? 0) ?></dd></div>
+        <div><dt>Monto original</dt><dd>S/ <?= number_format((float) ($contrato['monto_total'] ?? 0), 2) ?></dd></div>
+        <div><dt>Saldo original</dt><dd>S/ <?= number_format((float) ($contrato['monto_saldo'] ?? 0), 2) ?></dd></div>
+    </dl>
+    <?php if (! empty($contrato['observaciones'])): ?><p><strong>Observaciones:</strong> <?= nl2br(esc($contrato['observaciones'])) ?></p><?php endif; ?>
+    <h3>Servicios originales</h3>
+    <?php if ($contrato['servicios'] === []): ?><p>Sin servicios registrados.</p><?php endif; ?>
+    <?php foreach ($contrato['servicios'] as $servicio): ?>
+        <p><?= esc($servicio['nombre'] ?? '') ?> · S/ <?= number_format((float) ($servicio['precio_unitario'] ?? 0), 2) ?> por alumno</p>
+    <?php endforeach; ?>
+    <h3>Agenda original</h3>
+    <?php if ($contrato['agenda'] === []): ?><p>Sin agenda registrada.</p><?php endif; ?>
+    <?php foreach ($contrato['agenda'] as $sesion): ?><p><?= esc($sesion['fecha'] ?? '') ?> · <?= esc($sesion['detalle'] ?? '') ?></p><?php endforeach; ?>
+    <h3>Cuadros originales</h3>
+    <?php if ($contrato['cuadros'] === []): ?><p>Sin cuadros registrados.</p><?php endif; ?>
+    <?php foreach ($contrato['cuadros'] as $cuadro): ?><p><?= esc($cuadro['detalle'] ?? '') ?> · Cantidad: <?= esc($cuadro['cantidad'] ?? 0) ?></p><?php endforeach; ?>
+</section>
 
-        <h2>Agenda de sesiones</h2>
-        <div id="contract-agenda">
-            <?php $agenda = $contrato['agenda'] ?: [['fecha' => '', 'detalle' => '']]; ?>
-            <?php foreach ($agenda as $indice => $sesion): ?>
-                <div class="service-row">
-                    <label>Fecha
-                        <input name="agenda[<?= esc($indice) ?>][fecha]" type="date" value="<?= esc($sesion['fecha'] ?? '') ?>">
-                    </label>
-                    <label>Sesión / detalle
-                        <input name="agenda[<?= esc($indice) ?>][detalle]" maxlength="500" value="<?= esc($sesion['detalle'] ?? '') ?>" placeholder="Ej. Fotos grupales de primaria">
-                    </label>
-                </div>
-            <?php endforeach; ?>
+<section class="panel">
+    <h2>Adendas / ajustes de contrato</h2>
+    <p>Las modificaciones posteriores se registran aquí sin sobrescribir los datos del documento original.</p>
+    <?php if ($ajustes === []): ?>
+        <p>No se han registrado adendas.</p>
+    <?php else: ?>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead><tr><th>Fecha</th><th>Tipo</th><th>Motivo</th><th>Detalle</th><th>Impacto financiero</th></tr></thead>
+                <tbody>
+                    <?php foreach ($ajustes as $ajuste): ?>
+                        <?php $detalle = json_decode((string) $ajuste['detalle_json'], true); ?>
+                        <tr>
+                            <td><?= esc($ajuste['creado_en'] ? date('d/m/Y H:i', strtotime($ajuste['creado_en'])) : 'Sin fecha') ?></td>
+                            <td><?= esc(ucfirst($ajuste['tipo'])) ?></td>
+                            <td><?= esc($ajuste['motivo']) ?></td>
+                            <td>
+                                <?php if (is_array($detalle) && $ajuste['tipo'] === 'alumnos'): ?>
+                                    Variación: <?= esc($detalle['cantidad_alumnos_delta'] ?? 0) ?> alumnos
+                                <?php elseif (is_array($detalle) && $ajuste['tipo'] === 'servicio'): ?>
+                                    <?= esc(ucfirst($detalle['accion'] ?? '')) ?> <?= esc($detalle['servicio'] ?? '') ?> · <?= esc($detalle['cantidad'] ?? 0) ?> × S/ <?= number_format((float) ($detalle['precio_unitario'] ?? 0), 2) ?>
+                                <?php elseif (is_array($detalle)): ?>
+                                    <?= esc($detalle['concepto'] ?? '') ?>
+                                <?php endif; ?>
+                            </td>
+                            <td>S/ <?= number_format((float) $ajuste['impacto_financiero'], 2) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
-        <button class="button secondary" id="add-contract-session" type="button">Agregar fecha</button>
+    <?php endif; ?>
 
-        <h2>Cuadros</h2>
-        <div id="contract-frames">
-            <?php $cuadros = $contrato['cuadros'] ?: [['detalle' => '', 'cantidad' => 1]]; ?>
-            <?php foreach ($cuadros as $indice => $cuadro): ?>
-                <div class="service-row">
-                    <label>Especificación
-                        <input name="cuadros[<?= esc($indice) ?>][detalle]" maxlength="300" value="<?= esc($cuadro['detalle'] ?? '') ?>" placeholder="Ej. Retrato 30 x 40 cm">
-                    </label>
-                    <label>Cantidad
-                        <input name="cuadros[<?= esc($indice) ?>][cantidad]" type="number" min="1" max="10000" value="<?= esc($cuadro['cantidad'] ?? 1) ?>">
+    <?php if ($puedeCrearAjustes): ?>
+        <form class="quote-form" action="<?= base_url('admin/contratos/' . $contrato['id'] . '/ajustes') ?>" method="post">
+            <?= csrf_field() ?>
+            <h3>Registrar nueva adenda</h3>
+            <div class="form-grid">
+                <label class="form-field">Tipo de ajuste
+                    <select id="adjustment-type" name="tipo" required>
+                        <option value="alumnos">Cambio en cantidad de alumnos</option>
+                        <option value="servicio">Agregar o retirar servicio</option>
+                        <option value="recargo">Recargo</option>
+                    </select>
+                </label>
+                <label class="form-field full">Motivo
+                    <input name="motivo" minlength="5" maxlength="500" value="<?= esc(old('motivo')) ?>" required>
+                </label>
+                <div class="adjustment-fields" data-adjustment="alumnos">
+                    <label class="form-field">Variación de alumnos (+ / -)
+                        <input name="cantidad_delta" type="number" min="-10000" max="10000" value="<?= esc(old('cantidad_delta')) ?>">
                     </label>
                 </div>
-            <?php endforeach; ?>
-        </div>
-        <button class="button secondary" id="add-contract-frame" type="button">Agregar cuadro</button>
-
-        <h2>Alumnos</h2>
-        <?php if ($alumnos === []): ?><p>Aún no hay alumnos en el padrón.</p><?php endif; ?>
-        <?php foreach ($alumnos as $alumno): ?>
-            <div class="student-row">
-                <div>
-                    <strong><?= esc($alumno['nombre_completo']) ?></strong>
-                    <small><?= esc($alumno['tipo_registro']) ?> · <?= esc($alumno['estado']) ?><?= $alumno['numero_lista'] ? ' · Lista ' . esc($alumno['numero_lista']) : '' ?></small>
+                <div class="adjustment-fields" data-adjustment="servicio" hidden>
+                    <label class="form-field">Acción
+                        <select name="accion_servicio"><option value="agregar">Agregar</option><option value="retirar">Retirar</option></select>
+                    </label>
+                    <label class="form-field">Servicio
+                        <input name="servicio_nombre" maxlength="120">
+                    </label>
+                    <label class="form-field">Cantidad
+                        <input name="servicio_cantidad" type="number" min="1" max="10000" value="1">
+                    </label>
+                    <label class="form-field">Precio unitario (S/)
+                        <input name="servicio_precio" type="number" min="0" max="99999999.99" step="0.01">
+                    </label>
                 </div>
-                <?php if ($alumno['estado'] === 'Activo'): ?>
-                    <button class="button secondary compact" type="submit" name="retirar_alumno_id" value="<?= esc($alumno['id']) ?>">Dar de baja</button>
-                <?php endif; ?>
+                <div class="adjustment-fields" data-adjustment="recargo" hidden>
+                    <label class="form-field">Concepto
+                        <input name="concepto_recargo" maxlength="150">
+                    </label>
+                </div>
+                <label class="form-field">Impacto financiero (S/)
+                    <input name="impacto_financiero" type="number" min="-99999999.99" max="99999999.99" step="0.01" value="<?= esc(old('impacto_financiero', '0.00')) ?>" required>
+                    <small>Importe de la adenda; negativo para una reducción. Al retirar un servicio se registra como negativo automáticamente.</small>
+                </label>
             </div>
-        <?php endforeach; ?>
-        <label class="form-field">Alta de última hora
-            <input name="nuevo_alumno" maxlength="150" placeholder="Nombre completo del alumno">
-        </label>
-        <button class="button primary" type="submit">Guardar cambios</button>
-    </form>
-<?php else: ?>
-    <section class="panel">
-        <h2>Datos del contrato</h2>
-        <p><strong>Institución:</strong> <?= esc($contrato['nombre_colegio'] ?? 'Sin especificar') ?></p>
-        <p><strong>Promoción / sección:</strong> <?= esc($contrato['nombre_seccion'] ?? 'Sin especificar') ?></p>
-        <p><strong>Persona encargada:</strong> <?= esc($contrato['persona_encargada'] ?? 'Sin especificar') ?></p>
-        <p><strong>Teléfono / WhatsApp:</strong> <?= esc($contrato['telefono_contacto'] ?? 'Sin especificar') ?></p>
-        <p><strong>Nivel / aula:</strong> <?= esc(trim(($contrato['nivel'] ?? '') . ' ' . ($contrato['aula'] ?? '')) ?: 'Sin especificar') ?></p>
-        <p><strong>Alumnos iniciales:</strong> <?= esc($contrato['cant_alumnos_inicial'] ?? 0) ?></p>
-        <p><strong>Observaciones:</strong> <?= nl2br(esc($contrato['observaciones'] ?? '')) ?></p>
-        <h2>Servicios</h2>
-        <?php foreach ($contrato['servicios'] as $servicio): ?>
-            <p><?= esc($servicio['nombre'] ?? '') ?> · S/ <?= number_format((float) ($servicio['precio_unitario'] ?? 0), 2) ?> por estudiante</p>
-        <?php endforeach; ?>
-        <h2>Agenda</h2>
-        <?php foreach ($contrato['agenda'] as $sesion): ?>
-            <p><?= esc($sesion['fecha'] ?? '') ?> · <?= esc($sesion['detalle'] ?? '') ?></p>
-        <?php endforeach; ?>
-        <h2>Cuadros</h2>
-        <?php foreach ($contrato['cuadros'] as $cuadro): ?>
-            <p><?= esc($cuadro['detalle'] ?? '') ?> · Cantidad: <?= esc($cuadro['cantidad'] ?? 0) ?></p>
-        <?php endforeach; ?>
-        <h2>Alumnos</h2>
-        <?php foreach ($alumnos as $alumno): ?>
-            <p><?= esc($alumno['nombre_completo']) ?> · <?= esc($alumno['estado']) ?></p>
-        <?php endforeach; ?>
-    </section>
-<?php endif; ?>
-<?php if ($puedeEditar): ?>
-    <script>
-        const appendDetailRow = (containerId, html) => {
-            const container = document.getElementById(containerId);
-            const index = container.querySelectorAll('.service-row').length;
-            const row = document.createElement('div');
-            row.className = 'service-row';
-            row.innerHTML = html(index);
-            container.append(row);
-        };
-        document.getElementById('add-contract-service').addEventListener('click', () => appendDetailRow('contract-services', (index) => `
-            <input name="servicios[${index}][servicio_id]" type="hidden" value="">
-            <label>Servicio<input name="servicios[${index}][nombre]" maxlength="120" required></label>
-            <label>Precio por estudiante (S/)<input name="servicios[${index}][precio_unitario]" type="number" min="0" step="0.01" value="0" required></label>`));
-        document.getElementById('add-contract-session').addEventListener('click', () => appendDetailRow('contract-agenda', (index) => `
-            <label>Fecha<input name="agenda[${index}][fecha]" type="date"></label>
-            <label>Sesión / detalle<input name="agenda[${index}][detalle]" maxlength="500"></label>`));
-        document.getElementById('add-contract-frame').addEventListener('click', () => appendDetailRow('contract-frames', (index) => `
-            <label>Especificación<input name="cuadros[${index}][detalle]" maxlength="300"></label>
-            <label>Cantidad<input name="cuadros[${index}][cantidad]" type="number" min="1" max="10000" value="1"></label>`));
-    </script>
-<?php endif; ?>
+            <button class="button primary" type="submit">Registrar adenda</button>
+        </form>
+    <?php endif; ?>
+</section>
+
+<section class="panel">
+    <h2>Alumnos del contrato</h2>
+    <?php if ($alumnos === []): ?><p>Aún no hay alumnos en el padrón.</p><?php endif; ?>
+    <?php foreach ($alumnos as $alumno): ?>
+        <p><strong><?= esc($alumno['nombre_completo']) ?></strong> · <?= esc($alumno['tipo_registro']) ?> · <?= esc($alumno['estado']) ?><?= $alumno['numero_lista'] ? ' · Lista ' . esc($alumno['numero_lista']) : '' ?></p>
+    <?php endforeach; ?>
+</section>
+<script>
+(() => {
+    const type = document.getElementById('adjustment-type');
+    if (!type) return;
+    const showFields = () => {
+        document.querySelectorAll('.adjustment-fields').forEach((group) => {
+            const active = group.dataset.adjustment === type.value;
+            group.hidden = !active;
+            group.querySelectorAll('input, select').forEach((field) => {
+                field.disabled = !active;
+                field.required = active && ['cantidad_delta', 'servicio_nombre', 'servicio_cantidad', 'servicio_precio', 'concepto_recargo'].includes(field.name);
+            });
+        });
+    };
+    type.addEventListener('change', showFields);
+    showFields();
+})();
+</script>
 <?= $this->endSection() ?>

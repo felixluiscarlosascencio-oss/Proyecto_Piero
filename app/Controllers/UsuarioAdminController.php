@@ -124,6 +124,10 @@ class UsuarioAdminController extends BaseController
             return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No tienes permisos para realizar esta acción.');
         }
 
+        if ($id === 1) {
+            return redirect()->to(base_url('admin/usuarios'))->with('error', 'La cuenta raíz (ID 1) está protegida y no se puede eliminar.');
+        }
+
         if ($id === (int) session()->get('id_usuario')) {
             return redirect()->to(base_url('admin/usuarios'))->with('error', 'No puedes eliminar tu propia cuenta.');
         }

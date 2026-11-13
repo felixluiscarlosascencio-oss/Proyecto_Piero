@@ -75,8 +75,8 @@ CI_ENVIRONMENT = development
 
 app.baseURL = 'http://localhost:8080/'
 
-RECAPTCHA_SITE_KEY=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
-RECAPTCHA_SECRET_KEY=6LeIxAcTAAAAAHvR3VRdRM5zFKJZHPdDLW9_Zq7
+RECAPTCHA_SITE_KEY=6LfiZhsuAAAAAPheVeBsmWRlVTzv8c7QXtvN7Teq
+RECAPTCHA_SECRET_KEY=6LfiZhsuAAAAAKwh67jIGr0uDFFbo2e8gRd-dyW3
 
 database.default.hostname = localhost
 database.default.database = database.db

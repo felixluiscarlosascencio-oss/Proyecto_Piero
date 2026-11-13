@@ -42,12 +42,13 @@ $puedeEliminar = \App\Libraries\AdminAccess::isAdmin() || \App\Libraries\AdminAc
     <?php if ($administrador && in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin'], true) && $cotizacion['servicios'] !== []): ?>
         <form class="quote-form" action="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/precios') ?>" method="post">
             <?= csrf_field() ?>
-            <h3>Precios de cotización (independientes del precio interno)</h3>
+            <h3>Precios de cotización (se permiten descuentos sobre el precio interno congelado)</h3>
             <div class="service-selection">
                 <?php foreach ($cotizacion['servicios'] as $indice => $servicio): ?>
                     <label class="service-selection-row">
                         <span><?= esc($servicio['nombre'] ?? '') ?></span>
-                        <input name="precios[<?= (int) $indice ?>]" type="number" min="0" max="9999999999.99" step="0.01" value="<?= esc(old('precios.' . $indice, $servicio['precio_unitario'] ?? '0.00')) ?>" required>
+                        <?php $precioPorDefecto = (float) ($servicio['precio_unitario'] ?? 0) > 0 ? $servicio['precio_unitario'] : ($servicio['precio_interno'] ?? '0.00'); ?>
+                        <input name="precios[<?= (int) $indice ?>]" type="number" min="0.01" max="<?= esc($servicio['precio_interno'] ?? '9999999999.99') ?>" step="0.01" value="<?= esc(old('precios.' . $indice, $precioPorDefecto)) ?>" required>
                     </label>
                 <?php endforeach; ?>
             </div>
@@ -62,6 +63,9 @@ $puedeEliminar = \App\Libraries\AdminAccess::isAdmin() || \App\Libraries\AdminAc
 <section class="panel workflow-action">
     <h2>Acciones comerciales</h2>
     <div class="action-row">
+        <?php if ($administrador): ?>
+            <a class="button secondary" href="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/duplicar') ?>">Duplicar / Clonar cotización</a>
+        <?php endif; ?>
         <?php if ($administrador && in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin'], true)): ?>
             <button class="button primary" type="button" id="open-validity">Pasar a Cotización Vigente</button>
         <?php endif; ?>

@@ -17,7 +17,8 @@ class SolicitudAdminController extends BaseController
         $solicitudes = (new SolicitudAdminModel())
             ->select('solicitudes_admin.*, usuarios.nombre AS solicitante_nombre, usuarios.usuario AS solicitante_usuario')
             ->join('usuarios', 'usuarios.id = solicitudes_admin.solicitado_por', 'left')
-            ->orderBy('solicitudes_admin.created_at', 'DESC')
+            ->orderBy('solicitudes_admin.created_at', 'ASC')
+            ->orderBy('solicitudes_admin.id', 'ASC')
             ->findAll();
 
         return view('admin/solicitudes/index', ['solicitudes' => $solicitudes]);

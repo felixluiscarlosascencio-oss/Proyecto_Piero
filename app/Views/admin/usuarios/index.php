@@ -100,7 +100,7 @@
                                     </form>
                                 </details>
                                 <?php endif; ?>
-                                <?php if ((int) ($usuario['creado_por'] ?? 0) === (int) session()->get('id_usuario') && (int) $usuario['id'] !== (int) session()->get('id_usuario') && ! in_array($usuario['rol'], ['Dueno', 'Admin'], true)): ?>
+                                <?php if ((int) ($usuario['creado_por'] ?? 0) === (int) session()->get('id_usuario') && (int) $usuario['id'] !== 1 && (int) $usuario['id'] !== (int) session()->get('id_usuario') && ! in_array($usuario['rol'], ['Dueno', 'Admin'], true)): ?>
                                     <button class="button danger compact" type="button" data-delete-url="<?= base_url('admin/usuarios/' . $usuario['id'] . '/eliminar') ?>" data-delete-label="<?= esc($usuario['usuario']) ?>">Eliminar</button>
                                 <?php endif; ?>
                             </td>

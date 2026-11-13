@@ -42,13 +42,26 @@ button, input, select, textarea { font: inherit; }
 .user-caption { font-size: 11px; text-transform: uppercase; }
 .sidebar-user small { font-size: 12px; }
 .admin-nav { display: grid; gap: 5px; padding-top: 18px; }
-.admin-nav a { border-left: 3px solid transparent; border-radius: 5px; color: #e6e6e0; padding: 11px 10px; text-decoration: none; }
+.admin-nav a { align-items: center; border-left: 3px solid transparent; border-radius: 5px; color: #e6e6e0; display: flex; gap: 11px; padding: 11px 10px; text-decoration: none; }
+.admin-nav svg, .sidebar-logout svg, .global-search svg { fill: none; flex: 0 0 19px; height: 19px; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; width: 19px; }
 .admin-nav a:hover, .admin-nav a:focus-visible { background: var(--admin-black-soft); border-left-color: var(--admin-accent); color: #fff; }
 .admin-nav a.active, .admin-nav a[aria-current="page"] { background: var(--admin-accent); border-left-color: var(--admin-accent); color: #111; font-weight: 700; }
 .sidebar-logout { margin-top: auto; padding: 20px 7px 0; }
-.sidebar-logout button { background: transparent; border: 1px solid #555; border-radius: 5px; color: #f3d3c4; cursor: pointer; padding: 10px 12px; text-align: left; width: 100%; }
+.sidebar-logout button { align-items: center; background: transparent; border: 1px solid #555; border-radius: 5px; color: #f3d3c4; cursor: pointer; display: flex; gap: 11px; padding: 10px 12px; text-align: left; width: 100%; }
 .sidebar-logout button:hover { border-color: var(--admin-accent); color: #fff; }
 .admin-main { margin: 0 auto; max-width: 1420px; padding: 38px clamp(20px, 4vw, 64px) 56px; width: 100%; }
+.admin-topbar { align-items: center; background: #fff; border: 1px solid var(--admin-line); border-radius: 8px; display: flex; gap: 18px; justify-content: space-between; margin-bottom: 30px; padding: 12px 16px; }
+.global-search { align-items: center; display: flex; flex: 1; gap: 10px; max-width: 660px; }
+.global-search svg { color: var(--admin-muted); }
+.global-search input { background: #f8f8f5; border: 0; min-width: 100px; }
+.global-search button { background: transparent; border: 0; color: var(--admin-muted); cursor: pointer; font-weight: 600; padding: 8px; }
+.topbar-actions { align-items: center; display: flex; gap: 14px; }
+.admin-menu { position: relative; }
+.admin-menu summary { align-items: center; cursor: pointer; display: flex; font-weight: 700; gap: 8px; list-style: none; }
+.admin-menu summary::-webkit-details-marker { display: none; }
+.admin-avatar { align-items: center; background: #111; border-radius: 50%; color: #ffc800; display: inline-flex; height: 32px; justify-content: center; width: 32px; }
+.admin-menu-popover { background: #fff; border: 1px solid var(--admin-line); border-radius: 7px; box-shadow: 0 8px 24px rgb(0 0 0 / 14%); display: grid; gap: 10px; min-width: 190px; padding: 14px; position: absolute; right: 0; top: calc(100% + 10px); z-index: 5; }
+.admin-menu-popover a, .admin-menu-popover button { background: none; border: 0; color: var(--admin-ink); cursor: pointer; padding: 4px 0; text-align: left; text-decoration: none; }
 
 /* ---------- Encabezados y texto ---------- */
 .page-heading, .quote-heading { align-items: center; display: flex; justify-content: space-between; gap: 16px; }
@@ -105,6 +118,25 @@ input[type="checkbox"] { accent-color: #111; width: auto; }
 .workflow-action input { display: block; margin: 8px 0 12px; max-width: 180px; }
 .action-row, .inline-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 5px; }
 .form-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.adjustment-fields { align-items: start; display: grid; gap: 16px; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.dashboard-metrics { display: grid; gap: 16px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 18px; }
+.metric-card { display: grid; gap: 10px; }
+.metric-card > span { color: var(--admin-muted); font-size: 13px; font-weight: 600; }
+.metric-card > strong { font-size: clamp(22px, 2.4vw, 31px); }
+.metric-card small { color: var(--admin-muted); }
+.metric-positive { color: var(--admin-green) !important; }
+.metric-negative { color: #a12020 !important; }
+.dashboard-charts { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.chart-panel { min-width: 0; }
+.chart-panel canvas { display: block; height: 230px; width: 100%; }
+.chart-wide { grid-column: 1 / -1; }
+.chart-legend { color: var(--admin-muted); display: flex; flex-wrap: wrap; font-size: 13px; gap: 14px; justify-content: center; }
+.service-ranking { display: grid; gap: 13px; }
+.ranking-row { align-items: center; display: grid; gap: 12px; grid-template-columns: minmax(100px, 1fr) 3fr 45px; }
+.ranking-row > span { overflow-wrap: anywhere; }
+.ranking-row > strong { text-align: right; }
+.ranking-track { background: #efefe9; border-radius: 20px; height: 10px; overflow: hidden; }
+.ranking-track i { background: var(--admin-accent); border-radius: inherit; display: block; height: 100%; }
 .form-field { display: grid; gap: 7px; }
 .form-field.full { grid-column: 1 / -1; }
 .service-admin-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
@@ -155,10 +187,19 @@ dialog::backdrop { background: rgb(0 0 0 / 55%); }
     .admin-nav { gap: 2px; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); }
     .sidebar-logout { margin-top: 10px; }
     .sidebar-logout button { max-width: 200px; }
+    .admin-topbar { align-items: stretch; flex-direction: column; }
+    .topbar-actions { justify-content: space-between; }
+    .dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 600px) {
     .admin-main { padding: 26px 15px 40px; }
+    .admin-topbar { padding: 12px; }
+    .global-search { flex-wrap: wrap; }
+    .global-search input { flex: 1; }
+    .dashboard-metrics, .dashboard-charts { grid-template-columns: 1fr; }
+    .adjustment-fields { grid-template-columns: 1fr; }
+    .chart-wide { grid-column: auto; }
     .page-heading, .quote-heading { align-items: flex-start; flex-direction: column; }
     .service-row, .form-grid, .permission-list { grid-template-columns: 1fr; }
     .quote-details { grid-template-columns: 1fr; }
