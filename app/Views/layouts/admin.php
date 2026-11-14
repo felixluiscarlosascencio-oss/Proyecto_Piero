@@ -7,15 +7,9 @@
     <link rel="stylesheet" href="<?= base_url('css/admin.css') ?>">
 </head>
 <body>
-    <div class="admin-shell">
+    <div class="admin-shell<?= in_array(trim(uri_string(), '/'), ['admin', 'admin/dashboard', 'admin/reportes'], true) ? ' dashboard-shell' : '' ?>">
         <aside class="admin-sidebar">
             <a class="admin-brand" href="<?= base_url('admin/dashboard') ?>">PIERO <span>PRODUCCIONES</span></a>
-            <div class="sidebar-user">
-                <span class="user-caption">Sesión interna</span>
-                <strong><?= esc(session()->get('nombre') ?: session()->get('username')) ?></strong>
-                <span><?= esc(session()->get('cargo') ?: session()->get('rol')) ?></span>
-                <small>Rol: <?= esc(session()->get('rol')) ?></small>
-            </div>
             <?php $rutaActual = trim(uri_string(), '/'); ?>
             <nav class="admin-nav" aria-label="Menú administrativo">
                 <a href="<?= base_url('admin/dashboard') ?>" <?= $rutaActual === 'admin/dashboard' || $rutaActual === 'admin' ? 'aria-current="page"' : '' ?>><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="11" width="7" height="10" rx="1"/><rect x="3" y="14" width="8" height="7" rx="1"/></svg>Dashboard</a>
@@ -33,10 +27,6 @@
                     <a href="<?= base_url('admin/reportes') ?>" <?= $rutaActual === 'admin/reportes' ? 'aria-current="page"' : '' ?>><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Reportes</a>
                 <?php endif; ?>
             </nav>
-            <form class="sidebar-logout" action="<?= base_url('logout') ?>" method="post">
-                <?= csrf_field() ?>
-                <button type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/></svg>Cerrar sesión</button>
-            </form>
         </aside>
         <main class="admin-main">
             <header class="admin-topbar">
@@ -46,14 +36,41 @@
                     <input type="search" name="q" value="<?= esc(is_string($busquedaActual) ? $busquedaActual : '') ?>" placeholder="Buscar en el panel" aria-label="Búsqueda global">
                     <button type="submit">Buscar</button>
                 </form>
+                <?php
+                $nombreAdmin = session()->get('nombre') ?: session()->get('username') ?: 'Usuario';
+                $cargoAdmin = session()->get('cargo') ?: (session()->get('rol') === 'Dueno' ? 'Dueño' : (session()->get('rol') ?: 'Usuario'));
+                ?>
                 <div class="topbar-actions">
                     <?php if (\App\Libraries\AdminAccess::isAdmin()): ?><a class="button primary compact" href="<?= base_url('admin/cotizaciones/nueva') ?>">+ Nueva cotización</a><?php endif; ?>
                     <details class="admin-menu">
-                        <summary><span class="admin-avatar"><?= esc(mb_strtoupper(mb_substr((string) (session()->get('nombre') ?: 'A'), 0, 1))) ?></span><span>Admin</span><span aria-hidden="true">⌄</span></summary>
+                        <summary aria-label="Abrir menú de usuario">
+                            <span class="admin-avatar"><?= esc(mb_strtoupper(mb_substr((string) $nombreAdmin, 0, 1))) ?></span>
+                            <span>Admin</span>
+                            <span class="admin-menu-chevron" aria-hidden="true">⌄</span>
+                        </summary>
                         <div class="admin-menu-popover">
-                            <strong><?= esc(session()->get('nombre') ?: session()->get('username')) ?></strong>
-                            <?php if (in_array(session()->get('rol'), ['Dueno', 'Admin'], true)): ?><a href="<?= base_url('admin/usuarios') ?>">Administrar usuarios</a><?php endif; ?>
-                            <form action="<?= base_url('logout') ?>" method="post"><?= csrf_field() ?><button type="submit">Cerrar sesión</button></form>
+                            <div class="admin-profile">
+                                <span class="admin-profile-avatar" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>
+                                </span>
+                                <span class="admin-profile-details">
+                                    <strong><?= esc($nombreAdmin) ?></strong>
+                                    <span><?= esc($cargoAdmin) ?></span>
+                                </span>
+                            </div>
+                            <?php if (in_array(session()->get('rol'), ['Dueno', 'Admin'], true)): ?>
+                                <a href="<?= base_url('admin/usuarios') ?>">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 8h4M19 6v4"/></svg>
+                                    Administrar usuarios
+                                </a>
+                            <?php endif; ?>
+                            <form action="<?= base_url('logout') ?>" method="post">
+                                <?= csrf_field() ?>
+                                <button type="submit">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/></svg>
+                                    Cerrar sesión
+                                </button>
+                            </form>
                         </div>
                     </details>
                 </div>
