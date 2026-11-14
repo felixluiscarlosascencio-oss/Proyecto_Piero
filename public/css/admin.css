@@ -36,7 +36,10 @@ button, input, select, textarea { font: inherit; }
 .admin-sidebar :focus-visible { outline-color: var(--admin-accent); }
 .admin-brand { border-bottom: 1px solid #333; color: #fff; display: block; font-size: 18px; font-weight: 700; padding: 0 9px 22px; text-decoration: none; }
 .admin-brand span { color: var(--admin-accent); display: block; font-size: 11px; font-weight: 500; letter-spacing: .08em; margin-top: 3px; }
-.admin-nav { display: grid; gap: 5px; padding-top: 18px; }
+.admin-nav { display: grid; gap: 12px; padding-top: 18px; }
+.admin-nav-group { display: grid; gap: 3px; }
+.admin-nav-group + .admin-nav-group { border-top: 1px solid #333; padding-top: 12px; }
+.admin-nav-heading { color: #929292; font-size: 10px; font-weight: 700; letter-spacing: .12em; margin: 0 0 3px; padding: 0 10px; text-transform: uppercase; }
 .admin-nav a { align-items: center; border-left: 3px solid transparent; border-radius: 5px; color: #e6e6e0; display: flex; gap: 11px; padding: 11px 10px; text-decoration: none; }
 .admin-nav svg, .global-search svg { fill: none; flex: 0 0 19px; height: 19px; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; width: 19px; }
 .admin-nav a:hover, .admin-nav a:focus-visible { background: var(--admin-black-soft); border-left-color: var(--admin-accent); color: #fff; }
@@ -185,7 +188,7 @@ dialog::backdrop { background: rgb(0 0 0 / 55%); }
 @media (max-width: 850px) {
     .admin-shell { display: block; }
     .admin-sidebar { border-right: 0; border-bottom: 4px solid var(--admin-accent); min-height: auto; position: static; }
-    .admin-nav { gap: 2px; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); }
+    .admin-nav { gap: 2px 12px; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); }
     .admin-topbar { align-items: stretch; flex-direction: column; }
     .topbar-actions { justify-content: space-between; }
     .dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
