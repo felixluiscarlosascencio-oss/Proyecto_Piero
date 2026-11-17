@@ -41,9 +41,9 @@ class SolicitudCotizacionController extends BaseController
         $validation = service('validation');
         $validation->setRules([
             'nombre_colegio'       => 'required|string|max_length[150]',
-            'cantidad_estudiantes' => 'required|integer|greater_than[0]|less_than_equal_to[10000]',
+            'cantidad_estudiantes' => 'required|integer|greater_than[0]|less_than_equal_to[999]',
             'persona_encargada'    => 'required|string|max_length[150]',
-            'telefono_contacto'    => 'required|string|max_length[30]',
+            'telefono_contacto'    => 'required|string|exact_length[9]',
             'distrito'             => 'required|string|max_length[100]',
             'provincia'            => 'required|string|max_length[100]',
             'nivel'                => 'required|in_list[Inicial,Primaria,Secundaria]',
@@ -55,7 +55,7 @@ class SolicitudCotizacionController extends BaseController
             return $this->jsonError(422, 'Revisa los datos ingresados.', $validation->getErrors());
         }
 
-        if (! preg_match('/^[0-9+().\s-]{7,30}$/', $datos['telefono_contacto'])) {
+        if (! preg_match('/^[0-9]{9}$/', $datos['telefono_contacto'])) {
             return $this->jsonError(422, 'Ingresa un teléfono o WhatsApp válido.');
         }
 
@@ -143,13 +143,6 @@ class SolicitudCotizacionController extends BaseController
         }
 
         return $this->response->setStatusCode($status)->setJSON($body);
-    }
-
-    private function postString(string $field): string
-    {
-        $value = $this->request->getPost($field);
-
-        return is_string($value) ? trim($value) : '';
     }
 
     /**

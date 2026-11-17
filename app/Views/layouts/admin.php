@@ -1,16 +1,23 @@
+<?php
+$rutaActual = trim(uri_string(), '/');
+$esFormularioCotizacion = $rutaActual === 'admin/cotizaciones/nueva'
+    || preg_match('#^admin/cotizaciones/[0-9]+/duplicar$#', $rutaActual) === 1;
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= esc($this->renderSection('titulo')) ?> | Administración - Piero Producciones</title>
+    <?php if (str_starts_with($rutaActual, 'admin/servicios') || $esFormularioCotizacion): ?>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <?php endif; ?>
     <link rel="stylesheet" href="<?= base_url('css/admin.css') ?>">
 </head>
 <body>
     <div class="admin-shell<?= in_array(trim(uri_string(), '/'), ['admin', 'admin/dashboard', 'admin/reportes'], true) ? ' dashboard-shell' : '' ?>">
         <aside class="admin-sidebar">
             <a class="admin-brand" href="<?= base_url('admin/dashboard') ?>">PIERO <span>PRODUCCIONES</span></a>
-            <?php $rutaActual = trim(uri_string(), '/'); ?>
             <nav class="admin-nav" aria-label="Menú administrativo">
                 <div class="admin-nav-group">
                     <h2 class="admin-nav-heading">General</h2>
@@ -55,7 +62,7 @@
                 $cargoAdmin = session()->get('cargo') ?: (session()->get('rol') === 'Dueno' ? 'Dueño' : (session()->get('rol') ?: 'Usuario'));
                 ?>
                 <div class="topbar-actions">
-                    <?php if (\App\Libraries\AdminAccess::isAdmin()): ?><a class="button primary compact" href="<?= base_url('admin/cotizaciones/nueva') ?>">+ Nueva cotización</a><?php endif; ?>
+                    <?php if (\App\Libraries\AdminAccess::isAdmin() && in_array($rutaActual, ['admin', 'admin/dashboard'], true)): ?><a class="button primary compact" href="<?= base_url('admin/cotizaciones/nueva') ?>">+ Nueva cotización</a><?php endif; ?>
                     <details class="admin-menu">
                         <summary aria-label="Abrir menú de usuario">
                             <span class="admin-avatar"><?= esc(mb_strtoupper(mb_substr((string) $nombreAdmin, 0, 1))) ?></span>
@@ -92,5 +99,8 @@
             <?= $this->renderSection('contenido') ?>
         </main>
     </div>
+    <?php if (str_starts_with($rutaActual, 'admin/servicios')): ?>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <?php endif; ?>
 </body>
 </html>

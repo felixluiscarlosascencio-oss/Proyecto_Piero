@@ -20,6 +20,7 @@ class CotizacionController extends BaseController
         $cotizaciones = (new CotizacionModel())
             ->select('solicitudes_cotizacion.*, contratos.id AS contrato_id')
             ->join('contratos', 'contratos.cotizacion_id = solicitudes_cotizacion.id', 'left')
+            ->where('solicitudes_cotizacion.estado !=', CotizacionModel::ESTADO_REEMPLAZADA)
             ->orderBy('solicitudes_cotizacion.created_at', 'ASC')
             ->orderBy('solicitudes_cotizacion.id', 'ASC')
             ->findAll();
@@ -76,16 +77,21 @@ class CotizacionController extends BaseController
         if ($cotizacion === null) {
             return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se encontró la cotización que deseas duplicar.');
         }
+        if ($cotizacion['estado'] === CotizacionModel::ESTADO_REEMPLAZADA) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo puedes crear una versión nueva a partir de la cotización vigente.');
+        }
 
         $servicios = json_decode((string) $cotizacion['servicios_json'], true);
-        if (! is_array($servicios) || $servicios === []) {
-            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'La cotización original no contiene servicios válidos para duplicar.');
+        if (! is_array($servicios)) {
+            log_message('error', 'Invalid service data in quote #' . $id . ' while opening clone form.');
+
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se pudieron leer los servicios de la cotización original.');
         }
 
         $cotizacion['servicios'] = $servicios;
 
         return view('admin/cotizaciones/nueva', [
-            'serviciosCatalogo' => [],
+            'serviciosCatalogo' => $this->catalogoServicios(),
             'duplicada' => $cotizacion,
         ]);
     }
@@ -107,21 +113,40 @@ class CotizacionController extends BaseController
         $validation->setRules([
             'nombre_colegio'       => 'required|string|max_length[150]',
             'nombre_seccion'       => 'permit_empty|string|max_length[120]',
-            'cantidad_estudiantes' => 'required|integer|greater_than[0]|less_than_equal_to[10000]',
+            'cantidad_estudiantes' => 'required|integer|greater_than[0]|less_than_equal_to[999]',
             'persona_encargada'    => 'required|string|max_length[150]',
-            'telefono_contacto'    => 'required|string|max_length[30]',
+            'telefono_contacto'    => 'required|string|exact_length[9]',
         ]);
-        if (! $validation->run($datos) || ! preg_match('/^[0-9+().\s-]{7,30}$/', $datos['telefono_contacto'])) {
+        if (! $validation->run($datos) || ! preg_match('/^[0-9]{9}$/', $datos['telefono_contacto'])) {
             return redirect()->back()->withInput()->with('error', 'Revisa la institución, promoción, cantidad, persona encargada y teléfono.');
         }
 
-        $duplicarDe = filter_var($this->request->getPost('duplicar_de'), FILTER_VALIDATE_INT);
+        $postDuplicarDe = $this->request->getPost('duplicar_de');
+        $duplicarDe = filter_var($postDuplicarDe, FILTER_VALIDATE_INT);
+        if ($postDuplicarDe !== null && $postDuplicarDe !== ''
+            && ($duplicarDe === false || $duplicarDe < 1)) {
+            return redirect()->back()->withInput()->with('error', 'La cotización de origen no es válida.');
+        }
+        $rootId = null;
         if ($duplicarDe !== false && $duplicarDe > 0) {
             $cotizacionOrigen = (new CotizacionModel())->find($duplicarDe);
-            $serviciosOrigen = $cotizacionOrigen === null
-                ? null
-                : json_decode((string) $cotizacionOrigen['servicios_json'], true);
-            $servicios = $this->validarServiciosClonados($serviciosOrigen);
+            if ($cotizacionOrigen === null || $cotizacionOrigen['estado'] === CotizacionModel::ESTADO_REEMPLAZADA) {
+                return redirect()->back()->withInput()->with('error', 'Solo puedes crear una versión nueva a partir de la cotización vigente.');
+            }
+            $serviciosOrigen = json_decode((string) $cotizacionOrigen['servicios_json'], true);
+            $servicios = $this->serviciosClonados(
+                $serviciosOrigen,
+                $this->request->getPost('servicios'),
+                $this->request->getPost('precios')
+            );
+            $rootId = (int) ($cotizacionOrigen['cotizacion_origen_id'] ?? 0);
+            $rootId = $rootId > 0 ? $rootId : (int) $cotizacionOrigen['id'];
+            if ($rootId !== (int) $cotizacionOrigen['id']
+                && (new CotizacionModel())->find($rootId) === null) {
+                log_message('error', 'Quote #' . $duplicarDe . ' references missing version root #' . $rootId);
+
+                return redirect()->back()->withInput()->with('error', 'No se pudo identificar el historial de esta cotización.');
+            }
         } else {
             $servicios = $this->serviciosSeleccionados(
                 $this->request->getPost('servicios'),
@@ -140,7 +165,7 @@ class CotizacionController extends BaseController
         }
 
         $model = new CotizacionModel();
-        $id = $model->insert([
+        $registro = [
             'nombre_colegio'       => $datos['nombre_colegio'],
             'nombre_seccion'       => $datos['nombre_seccion'] !== '' ? $datos['nombre_seccion'] : null,
             'persona_encargada'    => $datos['persona_encargada'],
@@ -151,16 +176,48 @@ class CotizacionController extends BaseController
             'total_seccion'        => $total,
             'estado'               => CotizacionModel::ESTADO_APROBADA_ADMIN,
             'aprobado_por'         => (int) session()->get('id_usuario'),
-        ]);
+        ];
+        if ($rootId !== null) {
+            $registro['cotizacion_origen_id'] = $rootId;
+        }
 
-        if (! $id) {
-            log_message('error', 'Failed to create a manual quote: ' . json_encode($model->errors()));
+        $db = db_connect();
+        $db->transBegin();
+        try {
+            $id = $model->insert($registro);
+            if (! $id) {
+                throw new \RuntimeException('The new quote version could not be saved.');
+            }
+            if ($rootId !== null) {
+                $updated = $db->table('solicitudes_cotizacion')
+                    ->where('id !=', $id)
+                    ->groupStart()
+                        ->where('id', $rootId)
+                        ->orWhere('cotizacion_origen_id', $rootId)
+                    ->groupEnd()
+                    ->update([
+                        'estado' => CotizacionModel::ESTADO_REEMPLAZADA,
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
+                if (! $updated || $db->transStatus() === false) {
+                    throw new \RuntimeException('Previous quote versions could not be marked as historical.');
+                }
+            }
+            if ($db->transStatus() === false) {
+                throw new \RuntimeException('The quote transaction failed.');
+            }
+            $db->transCommit();
+        } catch (\Throwable $exception) {
+            $db->transRollback();
+            log_message('error', 'Failed to save quote version' . ($duplicarDe ? ' from #' . $duplicarDe : '') . ': ' . $exception->getMessage());
 
-            return redirect()->back()->withInput()->with('error', 'No se pudo crear la cotización.');
+            return redirect()->back()->withInput()->with('error', 'No se pudo guardar la cotización.');
         }
 
         return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
-            ->with('mensaje', 'Cotización creada. Ya puedes pasarla a vigente o a contrato.');
+            ->with('mensaje', $rootId !== null
+                ? 'Nueva versión creada. La anterior quedó en el historial y esta es la versión vigente.'
+                : 'Cotización creada. Ya puedes pasarla a vigente o a contrato.');
     }
 
     public function ver(int $id)
@@ -185,10 +242,46 @@ class CotizacionController extends BaseController
             ->where('cotizacion_id', $id)
             ->get()
             ->getRowArray();
+        $rootId = (int) ($cotizacion['cotizacion_origen_id'] ?? 0);
+        $rootId = $rootId > 0 ? $rootId : $id;
+        $versiones = db_connect()->table('solicitudes_cotizacion')
+            ->groupStart()
+                ->where('id', $rootId)
+                ->orWhere('cotizacion_origen_id', $rootId)
+            ->groupEnd()
+            ->orderBy('created_at', 'ASC')
+            ->orderBy('id', 'ASC')
+            ->get()
+            ->getResultArray();
+        $ultimaVersionId = $versiones === [] ? 0 : (int) $versiones[array_key_last($versiones)]['id'];
+        $idsVersiones = array_map('intval', array_column($versiones, 'id'));
+        $volverA = filter_var($this->request->getGet('volver'), FILTER_VALIDATE_INT);
+        $urlVolver = base_url('admin/cotizaciones');
+        $textoVolver = 'Volver a cotizaciones';
+        if ($volverA !== false && $volverA !== null && $volverA > 0
+            && $volverA !== $id && in_array($volverA, $idsVersiones, true)) {
+            $urlVolver = base_url('admin/cotizaciones/' . $volverA . '/ver');
+            $textoVolver = 'Volver al historial de cotizaciones';
+        }
+        $historial = array_values(array_filter(
+            $versiones,
+            static fn (array $version): bool => (int) $version['id'] !== $id && (int) $version['id'] !== $ultimaVersionId
+        ));
+        foreach ($historial as &$version) {
+            $version['servicios'] = json_decode((string) $version['servicios_json'], true);
+            if (! is_array($version['servicios'])) {
+                $version['servicios'] = [];
+            }
+        }
+        unset($version);
 
         return view('admin/cotizaciones/detalle', [
             'cotizacion' => $cotizacion,
             'contratoId' => $contrato['id'] ?? null,
+            'historial' => $historial,
+            'ultimaVersionId' => $ultimaVersionId,
+            'urlVolver' => $urlVolver,
+            'textoVolver' => $textoVolver,
         ]);
     }
 
@@ -200,7 +293,9 @@ class CotizacionController extends BaseController
 
         $model = new CotizacionModel();
         $cotizacion = $model->find($id);
-        if ($cotizacion === null || ! in_array($cotizacion['estado'], [CotizacionModel::ESTADO_SOLICITUD, CotizacionModel::ESTADO_APROBADA_ADMIN], true)) {
+        if ($cotizacion === null
+            || $cotizacion['estado'] !== CotizacionModel::ESTADO_SOLICITUD
+            || (float) $cotizacion['precio_unitario'] > 0) {
             return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se pueden actualizar los precios de esta cotización.');
         }
 
@@ -235,17 +330,26 @@ class CotizacionController extends BaseController
             return redirect()->back()->withInput()->with('error', 'El total de la cotización supera el máximo permitido.');
         }
 
-        if (! $model->update($id, [
-            'servicios_json'  => json_encode($servicios, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
-            'precio_unitario' => $precioUnitario,
-            'total_seccion'   => $total,
-        ])) {
-            log_message('error', 'Failed to update prices for quote #' . $id . ': ' . json_encode($model->errors()));
+        $actualizado = db_connect()->table('solicitudes_cotizacion')
+            ->where('id', $id)
+            ->where('estado', CotizacionModel::ESTADO_SOLICITUD)
+            ->where('precio_unitario <=', 0)
+            ->update([
+                'servicios_json'  => json_encode($servicios, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+                'precio_unitario' => $precioUnitario,
+                'total_seccion'   => $total,
+                'estado'          => CotizacionModel::ESTADO_APROBADA_ADMIN,
+                'updated_at'      => date('Y-m-d H:i:s'),
+            ]);
+        if (! $actualizado || db_connect()->affectedRows() !== 1) {
+            log_message('error', 'Failed to lock initial prices for quote #' . $id);
 
-            return redirect()->back()->with('error', 'No se pudieron guardar los precios de la cotización.');
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
+                ->with('error', 'La cotización ya se guardó o no se pudo actualizar; no se modificaron sus precios.');
         }
 
-        return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))->with('mensaje', 'Precios de cotización actualizados.');
+        return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
+            ->with('mensaje', 'Cotización guardada. Sus precios quedaron bloqueados; usa una nueva versión para realizar cambios.');
     }
 
     public function eliminar(int $id)
@@ -255,8 +359,15 @@ class CotizacionController extends BaseController
         }
 
         $model = new CotizacionModel();
-        if ($model->find($id) === null) {
+        $cotizacion = $model->find($id);
+        if ($cotizacion === null) {
             return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se encontró la cotización.');
+        }
+        if ($cotizacion['estado'] === CotizacionModel::ESTADO_REEMPLAZADA
+            || $cotizacion['cotizacion_origen_id'] !== null
+            || db_connect()->table('solicitudes_cotizacion')->where('cotizacion_origen_id', $id)->countAllResults() > 0) {
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
+                ->with('error', 'Las versiones históricas vinculadas se conservan para auditoría y no se pueden eliminar.');
         }
 
         if (db_connect()->table('contratos')->where('cotizacion_id', $id)->countAllResults() > 0) {
@@ -333,6 +444,10 @@ class CotizacionController extends BaseController
         $cotizacion = $model->find($id);
         if ($cotizacion === null) {
             return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se encontró la solicitud.');
+        }
+        if ($cotizacion['estado'] === CotizacionModel::ESTADO_REEMPLAZADA) {
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
+                ->with('error', 'No se puede crear un contrato desde una versión histórica de la cotización.');
         }
 
         $db = db_connect();
@@ -500,36 +615,70 @@ class CotizacionController extends BaseController
     }
 
     /**
-     * @param mixed $servicios
+     * @param mixed $serviciosOrigen
+     * @param mixed $seleccion
+     * @param mixed $precios
      * @return list<array<string, mixed>>
      */
-    private function validarServiciosClonados($servicios): array
+    private function serviciosClonados($serviciosOrigen, $seleccion, $precios): array
     {
-        if (! is_array($servicios)) {
+        if (! is_array($serviciosOrigen) || ! is_array($seleccion)) {
             return [];
         }
 
-        $resultado = [];
-        foreach ($servicios as $servicio) {
-            if (! is_array($servicio)
-                || ! is_string($servicio['nombre'] ?? null)
-                || trim($servicio['nombre']) === ''
-                || ! is_numeric($servicio['precio_unitario'] ?? null)
-                || (float) $servicio['precio_unitario'] < 0
-                || (float) $servicio['precio_unitario'] > 9999999999.99) {
+        $seleccionados = [];
+        $idsNuevos = [];
+        $idsOrigen = [];
+        foreach ($serviciosOrigen as $servicioOrigen) {
+            if (is_array($servicioOrigen) && isset($servicioOrigen['servicio_id'])) {
+                $idsOrigen[(string) $servicioOrigen['servicio_id']] = true;
+            }
+        }
+        foreach ($seleccion as $valor) {
+            if (! is_string($valor) && ! is_int($valor)) {
                 return [];
             }
-            $resultado[] = $servicio;
+            $valor = (string) $valor;
+            if (preg_match('/^origen-(\d+)$/', $valor, $coincidencia) === 1) {
+                $indice = (int) $coincidencia[1];
+                $servicio = $serviciosOrigen[$indice] ?? null;
+                if (! is_array($servicio)
+                    || ! is_string($servicio['nombre'] ?? null)
+                    || trim($servicio['nombre']) === ''
+                    || ! is_numeric($servicio['precio_unitario'] ?? null)
+                    || (float) $servicio['precio_unitario'] < 0
+                    || (float) $servicio['precio_unitario'] > 9999999999.99) {
+                    return [];
+                }
+                $seleccionados[] = $servicio;
+                continue;
+            }
+
+            $id = filter_var($valor, FILTER_VALIDATE_INT);
+            if ($id === false || $id < 1 || isset($idsOrigen[(string) $id])) {
+                return [];
+            }
+            $idsNuevos[] = $id;
         }
 
-        return $resultado;
-    }
+        $idsNuevos = array_values(array_unique($idsNuevos));
+        if ($idsNuevos !== []) {
+            if (! is_array($precios)) {
+                return [];
+            }
+            foreach ($idsNuevos as $id) {
+                if (! array_key_exists($id, $precios) || ! is_numeric($precios[$id])) {
+                    return [];
+                }
+            }
+            $nuevos = $this->serviciosSeleccionados($idsNuevos, $precios);
+            if (count($nuevos) !== count($idsNuevos)) {
+                return [];
+            }
+            $seleccionados = array_merge($seleccionados, $nuevos);
+        }
 
-    private function postString(string $field): string
-    {
-        $value = $this->request->getPost($field);
-
-        return is_string($value) ? trim($value) : '';
+        return $seleccionados;
     }
 
     /**

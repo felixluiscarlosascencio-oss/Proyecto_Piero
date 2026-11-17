@@ -10,6 +10,7 @@ class CotizacionModel extends Model
     public const ESTADO_APROBADA_ADMIN = 'aprobada_admin';
     public const ESTADO_PENDIENTE = 'pendiente';
     public const ESTADO_APROBADO = 'aprobado';
+    public const ESTADO_REEMPLAZADA = 'reemplazada';
 
     protected $table            = 'solicitudes_cotizacion';
     protected $primaryKey       = 'id';
@@ -32,6 +33,7 @@ class CotizacionModel extends Model
         'vence_en',
         'aprobado_por',
         'pdf_generado_en',
+        'cotizacion_origen_id',
     ];
 
     protected $useTimestamps = true;

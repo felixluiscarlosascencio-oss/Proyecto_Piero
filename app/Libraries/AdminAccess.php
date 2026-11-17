@@ -16,11 +16,6 @@ class AdminAccess
         return in_array(session()->get('rol'), ['Dueno', 'Admin'], true);
     }
 
-    public static function isOwner(): bool
-    {
-        return session()->get('rol') === 'Dueno';
-    }
-
     public static function can(string $permission): bool
     {
         if (self::isAdmin()) {

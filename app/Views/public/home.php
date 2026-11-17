@@ -113,7 +113,7 @@
                     </div>
                     <div class="form-group">
                         <label for="cantidad_estudiantes">Cantidad de estudiantes</label>
-                        <input class="form-control" id="cantidad_estudiantes" name="cantidad_estudiantes" type="number" min="1" max="10000" placeholder="Ej. 24" required>
+                        <input class="form-control" id="cantidad_estudiantes" name="cantidad_estudiantes" type="number" min="1" max="999" maxlength="3" step="1" oninput="this.value=this.value.replace(/[^0-9]/g, '').slice(0,3)" onfocus="this.select()" placeholder="Ej. 24" required>
                     </div>
                     <div class="form-group">
                         <label for="nivel">Nivel</label>
@@ -134,7 +134,7 @@
                     </div>
                     <div class="form-group">
                         <label for="telefono_contacto">Teléfono / WhatsApp</label>
-                        <input class="form-control" id="telefono_contacto" name="telefono_contacto" type="tel" maxlength="30" autocomplete="tel" required>
+                        <input class="form-control" id="telefono_contacto" name="telefono_contacto" type="tel" inputmode="numeric" pattern="[0-9]{9}" maxlength="9" oninput="this.value=this.value.replace(/[^0-9]/g, '').slice(0,9)" autocomplete="tel" required>
                     </div>
                     <div class="form-group form-group--wide">
                         <label for="observaciones">Observaciones o mensaje adicional <span>(opcional)</span></label>

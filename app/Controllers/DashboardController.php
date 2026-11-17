@@ -4,7 +4,6 @@ namespace App\Controllers;
 
 use App\Libraries\AdminAccess;
 use App\Models\CotizacionModel;
-use CodeIgniter\Database\BaseBuilder;
 
 class DashboardController extends BaseController
 {
@@ -28,27 +27,27 @@ class DashboardController extends BaseController
         $inicioMes = date('Y-m-01 00:00:00');
         $inicioMesAnterior = date('Y-m-01 00:00:00', strtotime('first day of previous month'));
         $finMesAnterior = date('Y-m-t 23:59:59', strtotime('last month'));
-        $cotizacionesMes = $this->contarCotizaciones($db->table('solicitudes_cotizacion')->where('created_at >=', $inicioMes));
-        $cotizacionesMesAnterior = $this->contarCotizaciones(
-            $db->table('solicitudes_cotizacion')
-                ->where('created_at >=', $inicioMesAnterior)
-                ->where('created_at <=', $finMesAnterior)
-        );
+        $cotizacionesMes = $db->table('solicitudes_cotizacion')
+            ->where('created_at >=', $inicioMes)
+            ->countAllResults();
+        $cotizacionesMesAnterior = $db->table('solicitudes_cotizacion')
+            ->where('created_at >=', $inicioMesAnterior)
+            ->where('created_at <=', $finMesAnterior)
+            ->countAllResults();
         $variacion = $cotizacionesMesAnterior === 0
             ? ($cotizacionesMes > 0 ? 100.0 : 0.0)
             : round((($cotizacionesMes - $cotizacionesMesAnterior) / $cotizacionesMesAnterior) * 100, 1);
 
         $estadoCounts = [
-            'pendientes' => $this->contarCotizaciones(
-                $db->table('solicitudes_cotizacion')
-                    ->whereIn('estado', [CotizacionModel::ESTADO_SOLICITUD, CotizacionModel::ESTADO_APROBADA_ADMIN, CotizacionModel::ESTADO_PENDIENTE])
-            ),
-            'aprobadas' => $this->contarCotizaciones(
-                $db->table('solicitudes_cotizacion')->whereIn('estado', [CotizacionModel::ESTADO_APROBADO, 'aprobada'])
-            ),
-            'rechazadas' => $this->contarCotizaciones(
-                $db->table('solicitudes_cotizacion')->whereIn('estado', ['rechazada', 'denegada'])
-            ),
+            'pendientes' => $db->table('solicitudes_cotizacion')
+                ->whereIn('estado', [CotizacionModel::ESTADO_SOLICITUD, CotizacionModel::ESTADO_APROBADA_ADMIN, CotizacionModel::ESTADO_PENDIENTE])
+                ->countAllResults(),
+            'aprobadas' => $db->table('solicitudes_cotizacion')
+                ->whereIn('estado', [CotizacionModel::ESTADO_APROBADO, 'aprobada'])
+                ->countAllResults(),
+            'rechazadas' => $db->table('solicitudes_cotizacion')
+                ->whereIn('estado', ['rechazada', 'denegada'])
+                ->countAllResults(),
         ];
         $ingresosEstimados = (float) ($db->table('solicitudes_cotizacion')
             ->selectSum('total_seccion', 'total')
@@ -63,11 +62,10 @@ class DashboardController extends BaseController
             $fin = $inicio->modify('last day of this month')->setTime(23, 59, 59);
             $meses[] = [
                 'label' => $inicio->format('m/Y'),
-                'total' => $this->contarCotizaciones(
-                    $db->table('solicitudes_cotizacion')
-                        ->where('created_at >=', $inicio->format('Y-m-d 00:00:00'))
-                        ->where('created_at <=', $fin->format('Y-m-d H:i:s'))
-                ),
+                'total' => $db->table('solicitudes_cotizacion')
+                    ->where('created_at >=', $inicio->format('Y-m-d 00:00:00'))
+                    ->where('created_at <=', $fin->format('Y-m-d H:i:s'))
+                    ->countAllResults(),
             ];
         }
 
@@ -164,10 +162,5 @@ class DashboardController extends BaseController
             'contratos' => $contratos,
             'usuarios' => $usuarios,
         ]);
-    }
-
-    private function contarCotizaciones(BaseBuilder $query): int
-    {
-        return $query->countAllResults();
     }
 }

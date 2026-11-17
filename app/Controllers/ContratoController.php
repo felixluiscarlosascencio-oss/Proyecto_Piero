@@ -5,6 +5,8 @@ namespace App\Controllers;
 use App\Libraries\AdminAccess;
 use App\Models\ServicioModel;
 use Config\Database;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 
 class ContratoController extends BaseController
 {
@@ -98,13 +100,12 @@ class ContratoController extends BaseController
         if (! in_array($tipo, ['alumnos', 'servicio', 'recargo'], true)
             || mb_strlen($motivo) < 5
             || mb_strlen($motivo) > 500
-            || ! is_numeric($impacto)
-            || abs((float) $impacto) > 99999999.99) {
+            || ($tipo !== 'servicio' && (! is_numeric($impacto) || abs((float) $impacto) > 99999999.99))) {
             return redirect()->back()->withInput()->with('error', 'Revisa el tipo, motivo e impacto financiero de la adenda.');
         }
 
         $detalle = [];
-        $impactoFinanciero = round((float) $impacto, 2);
+        $impactoFinanciero = is_numeric($impacto) ? round((float) $impacto, 2) : 0.0;
         if ($tipo === 'alumnos') {
             $cantidadDelta = filter_var($this->request->getPost('cantidad_delta'), FILTER_VALIDATE_INT);
             if ($cantidadDelta === false || $cantidadDelta === 0 || abs($cantidadDelta) > 10000) {
@@ -124,10 +125,11 @@ class ContratoController extends BaseController
                 || $cantidad > 10000
                 || ! is_numeric($precio)
                 || (float) $precio < 0
-                || (float) $precio > 99999999.99) {
+                || (float) $precio > 99999999.99
+                || $cantidad * (float) $precio > 99999999.99) {
                 return redirect()->back()->withInput()->with('error', 'Revisa la operación, servicio, cantidad y precio de la adenda.');
             }
-            $impactoFinanciero = abs($impactoFinanciero) * ($accion === 'retirar' ? -1 : 1);
+            $impactoFinanciero = round($cantidad * (float) $precio, 2) * ($accion === 'retirar' ? -1 : 1);
             $detalle = [
                 'accion' => $accion,
                 'servicio' => $nombre,
@@ -159,6 +161,42 @@ class ContratoController extends BaseController
         return redirect()->to(base_url('admin/contratos/' . $id))->with('mensaje', 'Adenda registrada. El contrato original permanece sin cambios.');
     }
 
+    public function descargarPdf(int $id)
+    {
+        if (! AdminAccess::can('contratos.ver')) {
+            return redirect()->to(base_url('admin/contratos'))->with('error', 'No tienes permiso para descargar contratos.');
+        }
+
+        $contrato = Database::connect()->table('contratos')->where('id', $id)->get()->getRowArray();
+        if ($contrato === null) {
+            return redirect()->to(base_url('admin/contratos'))->with('error', 'No se encontró el contrato.');
+        }
+
+        foreach (['servicios', 'agenda', 'cuadros'] as $detalle) {
+            $datos = json_decode($contrato[$detalle . '_json'] ?? '[]', true);
+            if (! is_array($datos)) {
+                log_message('error', 'Invalid ' . $detalle . ' data in contract #' . $id . ' while generating PDF.');
+
+                return redirect()->to(base_url('admin/contratos/' . $id))->with('error', 'No se pudo leer el contenido del contrato para generar el PDF.');
+            }
+            $contrato[$detalle] = $datos;
+        }
+
+        $options = new Options();
+        $options->set('isRemoteEnabled', false);
+        $pdf = new Dompdf($options);
+        $pdf->loadHtml(view('admin/contratos/pdf', ['contrato' => $contrato]), 'UTF-8');
+        $pdf->setPaper('A4', 'portrait');
+        $pdf->render();
+
+        $nombreArchivo = preg_replace('/[^A-Za-z0-9._-]/', '-', (string) ($contrato['numero_contrato'] ?: 'contrato-' . $id));
+
+        return $this->response
+            ->setHeader('Content-Type', 'application/pdf')
+            ->setHeader('Content-Disposition', 'attachment; filename="' . $nombreArchivo . '.pdf"')
+            ->setBody($pdf->output());
+    }
+
     public function actualizar(int $id)
     {
         return redirect()->to(base_url('admin/contratos/' . $id))
@@ -169,12 +207,5 @@ class ContratoController extends BaseController
     {
         return redirect()->to(base_url('admin/contratos/' . $id))
             ->with('error', 'Los contratos emitidos son inmutables y no se pueden eliminar.');
-    }
-
-    private function postString(string $field): string
-    {
-        $value = $this->request->getPost($field);
-
-        return is_string($value) ? trim($value) : '';
     }
 }

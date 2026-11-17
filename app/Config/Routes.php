@@ -46,6 +46,7 @@ $routes->group('admin', ['filter' => 'auth'], static function ($routes): void {
 
     $routes->get('contratos', 'ContratoController::index');
     $routes->get('contratos/(:num)', 'ContratoController::editar/$1');
+    $routes->get('contratos/(:num)/pdf', 'ContratoController::descargarPdf/$1');
     $routes->post('contratos/(:num)', 'ContratoController::actualizar/$1');
     $routes->post('contratos/(:num)/ajustes', 'ContratoController::crearAjuste/$1');
 });

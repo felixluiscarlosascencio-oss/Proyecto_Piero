@@ -2,12 +2,13 @@
 <?= $this->section('titulo') ?>Contrato <?= esc($contrato['numero_contrato'] ?: '#' . $contrato['id']) ?><?= $this->endSection() ?>
 <?= $this->section('contenido') ?>
 <?php $puedeCrearAjustes = \App\Libraries\AdminAccess::can('contratos.editar'); ?>
-<div class="page-heading">
+<div class="page-heading contract-heading">
     <div>
         <a class="back-link" href="<?= base_url('admin/contratos') ?>">&larr; Volver a contratos</a>
         <h1>Contrato <?= esc($contrato['numero_contrato'] ?: '#' . $contrato['id']) ?></h1>
         <p>Estado: <?= esc($contrato['estado_contrato'] ?? 'Activo') ?> · Documento original inmutable</p>
     </div>
+    <a class="button primary" href="<?= base_url('admin/contratos/' . $contrato['id'] . '/pdf') ?>">Descargar contrato PDF</a>
 </div>
 
 <?php if ($mensaje = session()->getFlashdata('mensaje')): ?><div class="alert success"><?= esc($mensaje) ?></div><?php endif; ?>
@@ -21,9 +22,9 @@
     </section>
 <?php endif; ?>
 
-<section class="panel">
+<section class="panel contract-panel">
     <h2>Documento original</h2>
-    <dl class="quote-details">
+    <dl class="quote-details contract-details">
         <div><dt>Institución</dt><dd><?= esc($contrato['nombre_colegio'] ?? 'Sin especificar') ?></dd></div>
         <div><dt>Promoción / sección</dt><dd><?= esc($contrato['nombre_seccion'] ?? 'Sin especificar') ?></dd></div>
         <div><dt>Persona encargada</dt><dd><?= esc($contrato['persona_encargada'] ?? 'Sin especificar') ?></dd></div>
@@ -47,7 +48,7 @@
     <?php foreach ($contrato['cuadros'] as $cuadro): ?><p><?= esc($cuadro['detalle'] ?? '') ?> · Cantidad: <?= esc($cuadro['cantidad'] ?? 0) ?></p><?php endforeach; ?>
 </section>
 
-<section class="panel">
+<section class="panel contract-panel">
     <h2>Adendas / ajustes de contrato</h2>
     <p>Las modificaciones posteriores se registran aquí sin sobrescribir los datos del documento original.</p>
     <?php if ($ajustes === []): ?>
@@ -81,7 +82,7 @@
     <?php endif; ?>
 
     <?php if ($puedeCrearAjustes): ?>
-        <form class="quote-form" action="<?= base_url('admin/contratos/' . $contrato['id'] . '/ajustes') ?>" method="post">
+        <form class="quote-form contract-adjustment-form" action="<?= base_url('admin/contratos/' . $contrato['id'] . '/ajustes') ?>" method="post">
             <?= csrf_field() ?>
             <h3>Registrar nueva adenda</h3>
             <div class="form-grid">
@@ -97,7 +98,7 @@
                 </label>
                 <div class="adjustment-fields" data-adjustment="alumnos">
                     <label class="form-field">Variación de alumnos (+ / -)
-                        <input name="cantidad_delta" type="number" min="-10000" max="10000" value="<?= esc(old('cantidad_delta')) ?>">
+                        <input class="compact-number" name="cantidad_delta" type="number" min="-10000" max="10000" step="1" onfocus="this.select()" value="<?= esc(old('cantidad_delta')) ?>">
                     </label>
                 </div>
                 <div class="adjustment-fields" data-adjustment="servicio" hidden>
@@ -108,10 +109,10 @@
                         <input name="servicio_nombre" maxlength="120">
                     </label>
                     <label class="form-field">Cantidad
-                        <input name="servicio_cantidad" type="number" min="1" max="10000" value="1">
+                        <input class="compact-number" name="servicio_cantidad" type="number" min="1" max="10000" step="1" onfocus="this.select()" value="1">
                     </label>
                     <label class="form-field">Precio unitario (S/)
-                        <input name="servicio_precio" type="number" min="0" max="99999999.99" step="0.01">
+                        <input class="compact-number money-number" name="servicio_precio" type="number" min="0" max="99999999.99" step="0.01" onfocus="this.select()">
                     </label>
                 </div>
                 <div class="adjustment-fields" data-adjustment="recargo" hidden>
@@ -120,8 +121,8 @@
                     </label>
                 </div>
                 <label class="form-field">Impacto financiero (S/)
-                    <input name="impacto_financiero" type="number" min="-99999999.99" max="99999999.99" step="0.01" value="<?= esc(old('impacto_financiero', '0.00')) ?>" required>
-                    <small>Importe de la adenda; negativo para una reducción. Al retirar un servicio se registra como negativo automáticamente.</small>
+                    <input id="adjustment-impact" class="compact-number money-number" name="impacto_financiero" type="number" min="-99999999.99" max="99999999.99" step="0.01" onfocus="this.select()" value="<?= esc(old('impacto_financiero', '0.00')) ?>" required>
+                    <small id="adjustment-impact-help">Importe de la adenda; los servicios se calculan automáticamente y al retirarlos se restan.</small>
                 </label>
             </div>
             <button class="button primary" type="submit">Registrar adenda</button>
@@ -129,7 +130,7 @@
     <?php endif; ?>
 </section>
 
-<section class="panel">
+<section class="panel contract-panel">
     <h2>Alumnos del contrato</h2>
     <?php if ($alumnos === []): ?><p>Aún no hay alumnos en el padrón.</p><?php endif; ?>
     <?php foreach ($alumnos as $alumno): ?>
@@ -140,6 +141,18 @@
 (() => {
     const type = document.getElementById('adjustment-type');
     if (!type) return;
+    const impact = document.getElementById('adjustment-impact');
+    const serviceAction = document.querySelector('[name="accion_servicio"]');
+    const serviceQuantity = document.querySelector('[name="servicio_cantidad"]');
+    const servicePrice = document.querySelector('[name="servicio_precio"]');
+    const updateImpact = () => {
+        const isService = type.value === 'servicio';
+        impact.readOnly = isService;
+        if (isService) {
+            const amount = (Number(serviceQuantity.value) || 0) * (Number(servicePrice.value) || 0);
+            impact.value = (serviceAction.value === 'retirar' ? -amount : amount).toFixed(2);
+        }
+    };
     const showFields = () => {
         document.querySelectorAll('.adjustment-fields').forEach((group) => {
             const active = group.dataset.adjustment === type.value;
@@ -149,8 +162,11 @@
                 field.required = active && ['cantidad_delta', 'servicio_nombre', 'servicio_cantidad', 'servicio_precio', 'concepto_recargo'].includes(field.name);
             });
         });
+        updateImpact();
     };
     type.addEventListener('change', showFields);
+    [serviceAction, serviceQuantity, servicePrice].forEach((field) => field.addEventListener('input', updateImpact));
+    serviceAction.addEventListener('change', updateImpact);
     showFields();
 })();
 </script>

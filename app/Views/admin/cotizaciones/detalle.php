@@ -5,10 +5,19 @@
 $estadoVisible = $cotizacion['estado'] === 'aprobada_admin' ? 'Aprobada por el administrador' : ucfirst($cotizacion['estado']);
 $administrador = \App\Libraries\AdminAccess::isAdmin();
 $puedeEliminar = \App\Libraries\AdminAccess::isAdmin() || \App\Libraries\AdminAccess::can('cotizaciones.eliminar');
+$puedeCrearVersion = $administrador && (int) $cotizacion['id'] === $ultimaVersionId;
+$puedeActivar = $administrador && in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin'], true);
+$puedePasarContrato = $administrador && $contratoId === null && $cotizacion['estado'] !== \App\Models\CotizacionModel::ESTADO_REEMPLAZADA;
+$puedeEliminarCotizacion = $puedeEliminar && $contratoId === null
+    && $cotizacion['estado'] !== \App\Models\CotizacionModel::ESTADO_REEMPLAZADA
+    && $cotizacion['cotizacion_origen_id'] === null;
+$puedeDescargarPdf = $administrador && $cotizacion['estado'] === 'pendiente';
+$mostrarAcciones = $puedeCrearVersion || $puedeActivar || $puedePasarContrato
+    || $puedeEliminarCotizacion || $puedeDescargarPdf || $contratoId !== null;
 ?>
 <div class="page-heading">
     <div>
-        <a class="back-link" href="<?= base_url('admin/cotizaciones') ?>">&larr; Volver a cotizaciones</a>
+        <a class="back-link" href="<?= esc($urlVolver) ?>">&larr; <?= esc($textoVolver) ?></a>
         <h1>Detalle de cotización #<?= esc($cotizacion['id']) ?></h1>
     </div>
     <span class="status status-<?= esc($cotizacion['estado']) ?>"><?= esc($estadoVisible) ?></span>
@@ -39,20 +48,20 @@ $puedeEliminar = \App\Libraries\AdminAccess::isAdmin() || \App\Libraries\AdminAc
             <?php endforeach; ?>
         </ul>
     <?php endif; ?>
-    <?php if ($administrador && in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin'], true) && $cotizacion['servicios'] !== []): ?>
+    <?php if ($administrador && $cotizacion['estado'] === \App\Models\CotizacionModel::ESTADO_SOLICITUD && (float) $cotizacion['precio_unitario'] <= 0 && $cotizacion['servicios'] !== []): ?>
         <form class="quote-form" action="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/precios') ?>" method="post">
             <?= csrf_field() ?>
-            <h3>Precios de cotización (se permiten descuentos sobre el precio interno congelado)</h3>
+            <h3>Definir precios para emitir la cotización</h3>
             <div class="service-selection">
                 <?php foreach ($cotizacion['servicios'] as $indice => $servicio): ?>
                     <label class="service-selection-row">
                         <span><?= esc($servicio['nombre'] ?? '') ?></span>
                         <?php $precioPorDefecto = (float) ($servicio['precio_unitario'] ?? 0) > 0 ? $servicio['precio_unitario'] : ($servicio['precio_interno'] ?? '0.00'); ?>
-                        <input name="precios[<?= (int) $indice ?>]" type="number" min="0.01" max="<?= esc($servicio['precio_interno'] ?? '9999999999.99') ?>" step="0.01" value="<?= esc(old('precios.' . $indice, $precioPorDefecto)) ?>" required>
+                        <input name="precios[<?= (int) $indice ?>]" type="number" min="1" max="<?= esc($servicio['precio_interno'] ?? '9999999999.99') ?>" step="1" onfocus="this.select()" value="<?= esc(old('precios.' . $indice, $precioPorDefecto)) ?>" required>
                     </label>
                 <?php endforeach; ?>
             </div>
-            <button class="button primary" type="submit">Guardar precios</button>
+            <button class="button primary" type="submit">Guardar</button>
         </form>
     <?php endif; ?>
     <?php if ($cotizacion['vence_en']): ?>
@@ -60,33 +69,69 @@ $puedeEliminar = \App\Libraries\AdminAccess::isAdmin() || \App\Libraries\AdminAc
     <?php endif; ?>
 </section>
 
+<?php if ($historial !== []): ?>
+    <section class="panel quote-history">
+        <h2>Historial de cotizaciones anteriores</h2>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Versión</th>
+                        <th>N.º de cotización</th>
+                        <th>Fecha</th>
+                        <th>Alumnos</th>
+                        <th>Servicios cotizados</th>
+                        <th>Total estimado</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($historial as $numeroVersion => $version): ?>
+                        <?php $serviciosVersion = array_filter(array_column($version['servicios'], 'nombre'), 'is_string'); ?>
+                        <tr>
+                            <td><strong>Versión <?= $numeroVersion + 1 ?></strong></td>
+                            <td><strong>#<?= esc($version['id']) ?></strong></td>
+                            <td><?= esc($version['created_at'] ? date('d/m/Y H:i', strtotime($version['created_at'])) : 'Sin fecha') ?></td>
+                            <td><?= esc($version['cantidad_estudiantes']) ?></td>
+                            <td><?= esc($serviciosVersion !== [] ? implode(', ', $serviciosVersion) : 'Sin servicios') ?></td>
+                            <td>S/ <?= number_format((float) $version['total_seccion'], 2) ?></td>
+                            <td><a class="button secondary compact" href="<?= base_url('admin/cotizaciones/' . $version['id'] . '/ver') . '?volver=' . (int) $cotizacion['id'] ?>">Ver</a></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </section>
+<?php endif; ?>
+
+<?php if ($mostrarAcciones): ?>
 <section class="panel workflow-action">
     <h2>Acciones comerciales</h2>
     <div class="action-row">
-        <?php if ($administrador): ?>
-            <a class="button secondary" href="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/duplicar') ?>">Duplicar / Clonar cotización</a>
+        <?php if ($puedeCrearVersion): ?>
+            <a class="button secondary" href="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/duplicar') ?>">Nueva versión</a>
         <?php endif; ?>
-        <?php if ($administrador && in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin'], true)): ?>
+        <?php if ($puedeActivar): ?>
             <button class="button primary" type="button" id="open-validity">Pasar a Cotización Vigente</button>
         <?php endif; ?>
 
         <?php if ($contratoId !== null): ?>
             <a class="button secondary" href="<?= base_url('admin/contratos/' . $contratoId) ?>">Abrir contrato asociado</a>
-        <?php elseif ($administrador): ?>
+        <?php elseif ($puedePasarContrato): ?>
             <form action="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/contrato') ?>" method="post" onsubmit="return confirm('¿Pasar esta solicitud a contrato?');">
                 <?= csrf_field() ?>
                 <button class="button primary" type="submit">Pasar a Contrato</button>
             </form>
         <?php endif; ?>
 
-        <?php if ($puedeEliminar && $contratoId === null): ?>
+        <?php if ($puedeEliminarCotizacion): ?>
             <form action="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/eliminar') ?>" method="post" onsubmit="return confirm('¿Eliminar esta cotización? Esta acción no se puede deshacer.');">
                 <?= csrf_field() ?>
                 <button class="button danger" type="submit">Eliminar</button>
             </form>
         <?php endif; ?>
 
-        <?php if ($administrador && $cotizacion['estado'] === 'pendiente'): ?>
+        <?php if ($puedeDescargarPdf): ?>
             <form action="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/pdf') ?>" method="post">
                 <?= csrf_field() ?>
                 <button class="button secondary" type="submit">Descargar cotización PDF</button>
@@ -97,6 +142,27 @@ $puedeEliminar = \App\Libraries\AdminAccess::isAdmin() || \App\Libraries\AdminAc
         <p class="alert error">La vigencia requiere un precio total mayor que cero. Configura los precios de cotización.</p>
     <?php endif; ?>
 </section>
+<?php endif; ?>
+
+<?php if ($administrador && $cotizacion['estado'] === \App\Models\CotizacionModel::ESTADO_SOLICITUD && (float) $cotizacion['precio_unitario'] <= 0 && $cotizacion['servicios'] !== []): ?>
+    <script>
+        document.querySelector('.quote-form')?.addEventListener('submit', (event) => {
+            const form = event.currentTarget;
+            if (form.dataset.submitting === 'true') {
+                event.preventDefault();
+                return;
+            }
+            form.dataset.submitting = 'true';
+            form.classList.add('form-submitting');
+            form.setAttribute('aria-busy', 'true');
+            form.querySelectorAll('input:not([type="hidden"])').forEach((input) => { input.readOnly = true; });
+            form.querySelectorAll('button[type="submit"]').forEach((button) => {
+                button.disabled = true;
+                button.textContent = 'Guardando…';
+            });
+        });
+    </script>
+<?php endif; ?>
 
 <?php if ($administrador && in_array($cotizacion['estado'], ['solicitud', 'aprobada_admin'], true)): ?>
     <dialog id="validity-dialog" aria-labelledby="validity-title">
@@ -104,7 +170,7 @@ $puedeEliminar = \App\Libraries\AdminAccess::isAdmin() || \App\Libraries\AdminAc
             <?= csrf_field() ?>
             <h2 id="validity-title">Definir vigencia</h2>
             <label for="dias_vigencia">Días de vigencia (1–365)</label>
-            <input id="dias_vigencia" name="dias_vigencia" type="number" min="1" max="365" value="<?= esc(old('dias_vigencia', 15)) ?>" required>
+            <input id="dias_vigencia" name="dias_vigencia" type="number" min="1" max="365" step="1" onfocus="this.select()" value="<?= esc(old('dias_vigencia', 15)) ?>" required>
             <div class="dialog-actions">
                 <button class="button secondary" type="button" id="close-validity">Cancelar</button>
                 <button class="button primary" type="submit">Confirmar vigencia</button>

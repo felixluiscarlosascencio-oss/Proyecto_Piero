@@ -6,7 +6,7 @@
         <h1><?= ! empty($vigentes) ? 'Cotizaciones vigentes' : 'Cotizaciones' ?></h1>
         <p><?= ! empty($vigentes) ? 'Propuestas aprobadas y dentro de su periodo de vigencia.' : 'Revisa las solicitudes recibidas desde el cotizador público.' ?></p>
     </div>
-    <?php if (! empty($puedeCrear)): ?>
+    <?php if (! empty($puedeCrear) && empty($vigentes)): ?>
         <a class="button primary" href="<?= base_url('admin/cotizaciones/nueva') ?>">Crear cotización</a>
     <?php endif; ?>
 </div>
@@ -46,7 +46,7 @@
                 <?php endif; ?>
                 <div class="action-row">
                     <a class="button secondary compact" href="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/ver') ?>">Ver</a>
-                    <?php if ($puedeEliminar && empty($cotizacion['contrato_id'])): ?>
+                    <?php if ($puedeEliminar && empty($cotizacion['contrato_id']) && $cotizacion['cotizacion_origen_id'] === null): ?>
                         <button class="button danger compact" type="button" data-delete-url="<?= base_url('admin/cotizaciones/' . $cotizacion['id'] . '/eliminar') ?>" data-delete-label="Solicitud #<?= esc($cotizacion['id']) ?>">Eliminar</button>
                     <?php endif; ?>
                 </div>
