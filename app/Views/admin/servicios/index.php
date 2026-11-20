@@ -17,10 +17,7 @@
 <?php else: ?>
     <div class="service-admin-grid">
         <?php foreach ($servicios as $servicio): ?>
-            <?php
-            $galeria = json_decode($servicio['galeria_json'] ?? '[]', true);
-            $galeria = is_array($galeria) ? $galeria : [];
-            ?>
+            <?php $galeria = galeria_servicio($servicio['galeria_json'] ?? null); ?>
             <article class="panel service-admin-card">
                 <h2><?= esc($servicio['nombre_item']) ?></h2>
                 <?php if (! empty($servicio['etiqueta_destacada'])): ?><p><strong>Etiqueta:</strong> <?= esc($servicio['etiqueta_destacada']) ?></p><?php endif; ?>

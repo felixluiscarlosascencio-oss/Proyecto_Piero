@@ -3,17 +3,19 @@
 namespace App\Controllers;
 
 use App\Libraries\AdminAccess;
+use App\Libraries\DocumentoCodigo;
 use App\Models\ServicioModel;
 use Config\Database;
 use Dompdf\Dompdf;
 use Dompdf\Options;
+use Throwable;
 
 class ContratoController extends BaseController
 {
     public function index()
     {
         if (! AdminAccess::can('contratos.ver')) {
-            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No tienes permiso para ver contratos.');
+            return $this->sinPermiso('No tienes permiso para ver contratos.');
         }
 
         $contratos = Database::connect()->table('contratos')->orderBy('id', 'DESC')->get()->getResultArray();
@@ -24,7 +26,7 @@ class ContratoController extends BaseController
     public function editar(int $id)
     {
         if (! AdminAccess::can('contratos.ver')) {
-            return redirect()->to(base_url('admin/contratos'))->with('error', 'No tienes permiso para ver contratos.');
+            return $this->sinPermiso('No tienes permiso para ver contratos.');
         }
 
         $db = Database::connect();
@@ -43,6 +45,10 @@ class ContratoController extends BaseController
         foreach (['servicios', 'agenda', 'cuadros'] as $detalle) {
             $datos = json_decode($contrato[$detalle . '_json'] ?? '[]', true);
             $contrato[$detalle] = is_array($datos) ? $datos : [];
+        }
+        $montoVigente = (float) ($contrato['monto_total'] ?? 0);
+        foreach ($ajustes as $ajuste) {
+            $montoVigente += (float) ($ajuste['impacto_financiero'] ?? 0);
         }
 
         $costoInternoEstimado = null;
@@ -79,6 +85,7 @@ class ContratoController extends BaseController
             'contrato' => $contrato,
             'alumnos' => $alumnos,
             'ajustes' => $ajustes,
+            'montoVigente' => $montoVigente,
             'costoInternoEstimado' => $costoInternoEstimado,
         ]);
     }
@@ -144,27 +151,52 @@ class ContratoController extends BaseController
             $detalle = ['concepto' => $concepto];
         }
 
-        if (! $db->table('contrato_ajustes')->insert([
-            'contrato_id' => $id,
-            'tipo' => $tipo,
-            'motivo' => $motivo,
-            'detalle_json' => json_encode($detalle, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
-            'impacto_financiero' => $impactoFinanciero,
-            'creado_por' => (int) session()->get('id_usuario'),
-            'creado_en' => date('Y-m-d H:i:s'),
-        ])) {
-            log_message('error', 'Failed to create a contract addendum for contract #' . $id . '.');
+        $db->transBegin();
+        try {
+            $codigo = DocumentoCodigo::siguiente(DocumentoCodigo::ADE);
+            $insertado = $db->table('contrato_ajustes')->insert([
+                'codigo' => $codigo,
+                'contrato_id' => $id,
+                'tipo' => $tipo,
+                'motivo' => $motivo,
+                'detalle_json' => json_encode($detalle, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+                'impacto_financiero' => $impactoFinanciero,
+                'creado_por' => (int) session()->get('id_usuario'),
+                'creado_en' => date('Y-m-d H:i:s'),
+            ]);
+            if (! $insertado) {
+                throw new \RuntimeException('The addendum could not be saved.');
+            }
+            $db->table('eventos_comerciales')->insert([
+                'cotizacion_id' => null,
+                'contrato_id' => $id,
+                'tipo' => 'adenda_creada',
+                'detalle' => json_encode([
+                    'codigo' => $codigo,
+                    'tipo' => $tipo,
+                    'impacto' => $impactoFinanciero,
+                ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+                'usuario_id' => (int) session()->get('id_usuario'),
+                'creado_en' => date('Y-m-d H:i:s'),
+            ]);
+            if ($db->transStatus() === false) {
+                throw new \RuntimeException('The addendum transaction failed.');
+            }
+            $db->transCommit();
+        } catch (Throwable $exception) {
+            $db->transRollback();
+            log_message('error', 'Failed to create a contract addendum for contract #' . $id . ': ' . $exception->getMessage());
 
             return redirect()->back()->withInput()->with('error', 'No se pudo guardar la adenda.');
         }
 
-        return redirect()->to(base_url('admin/contratos/' . $id))->with('mensaje', 'Adenda registrada. El contrato original permanece sin cambios.');
+        return redirect()->to(base_url('admin/contratos/' . $id))->with('mensaje', 'Adenda ' . $codigo . ' registrada. El contrato original permanece sin cambios.');
     }
 
     public function descargarPdf(int $id)
     {
         if (! AdminAccess::can('contratos.ver')) {
-            return redirect()->to(base_url('admin/contratos'))->with('error', 'No tienes permiso para descargar contratos.');
+            return $this->sinPermiso('No tienes permiso para descargar contratos.');
         }
 
         $contrato = Database::connect()->table('contratos')->where('id', $id)->get()->getRowArray();
@@ -182,30 +214,33 @@ class ContratoController extends BaseController
             $contrato[$detalle] = $datos;
         }
 
+        $ajustes = Database::connect()->table('contrato_ajustes')
+            ->where('contrato_id', $id)
+            ->orderBy('creado_en', 'ASC')
+            ->orderBy('id', 'ASC')
+            ->get()
+            ->getResultArray();
+        $montoVigente = (float) ($contrato['monto_total'] ?? 0);
+        foreach ($ajustes as $ajuste) {
+            $montoVigente += (float) ($ajuste['impacto_financiero'] ?? 0);
+        }
+
         $options = new Options();
         $options->set('isRemoteEnabled', false);
         $pdf = new Dompdf($options);
-        $pdf->loadHtml(view('admin/contratos/pdf', ['contrato' => $contrato]), 'UTF-8');
+        $pdf->loadHtml(view('admin/contratos/pdf', [
+            'contrato' => $contrato,
+            'ajustes' => $ajustes,
+            'montoVigente' => $montoVigente,
+        ]), 'UTF-8');
         $pdf->setPaper('A4', 'portrait');
         $pdf->render();
 
-        $nombreArchivo = preg_replace('/[^A-Za-z0-9._-]/', '-', (string) ($contrato['numero_contrato'] ?: 'contrato-' . $id));
+        $nombreArchivo = preg_replace('/[^A-Za-z0-9._-]/', '-', (string) (($contrato['codigo'] ?? '') ?: ($contrato['numero_contrato'] ?: 'contrato-' . $id)));
 
         return $this->response
             ->setHeader('Content-Type', 'application/pdf')
             ->setHeader('Content-Disposition', 'attachment; filename="' . $nombreArchivo . '.pdf"')
             ->setBody($pdf->output());
-    }
-
-    public function actualizar(int $id)
-    {
-        return redirect()->to(base_url('admin/contratos/' . $id))
-            ->with('error', 'La edición directa de contratos está bloqueada. Registra los cambios mediante una adenda.');
-    }
-
-    public function eliminar(int $id)
-    {
-        return redirect()->to(base_url('admin/contratos/' . $id))
-            ->with('error', 'Los contratos emitidos son inmutables y no se pueden eliminar.');
     }
 }

@@ -53,6 +53,13 @@ class SolicitudAdminController extends BaseController
             }
 
             if ($solicitud['accion'] === 'eliminar') {
+                if ($cotizacion['estado'] === CotizacionModel::ESTADO_REEMPLAZADA
+                    || $cotizacion['cotizacion_origen_id'] !== null
+                    || $db->table('solicitudes_cotizacion')->where('cotizacion_origen_id', $cotizacion['id'])->countAllResults() > 0) {
+                    $db->transRollback();
+
+                    return redirect()->to(base_url('admin/solicitudes'))->with('error', 'Las versiones históricas vinculadas se conservan para auditoría y no se pueden eliminar.');
+                }
                 if ($db->table('contratos')->where('cotizacion_id', $cotizacion['id'])->countAllResults() > 0) {
                     $db->transRollback();
 

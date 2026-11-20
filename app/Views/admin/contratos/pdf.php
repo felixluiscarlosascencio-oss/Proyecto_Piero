@@ -19,7 +19,7 @@
 </head>
 <body>
     <h1>PIERO PRODUCCIONES</h1>
-    <p><strong>CONTRATO <?= esc($contrato['numero_contrato'] ?: '#' . $contrato['id']) ?></strong></p>
+    <p><strong>CONTRATO <?= esc($contrato['codigo'] ?: ($contrato['numero_contrato'] ?: '#' . $contrato['id'])) ?></strong></p>
     <div class="meta">
         <p><strong>Institución:</strong> <?= esc($contrato['nombre_colegio'] ?? 'Sin especificar') ?></p>
         <p><strong>Promoción / sección:</strong> <?= esc($contrato['nombre_seccion'] ?? 'Sin especificar') ?></p>
@@ -48,6 +48,24 @@
         </table>
     <?php endif; ?>
     <p class="total">Monto original: S/ <?= number_format((float) ($contrato['monto_total'] ?? 0), 2) ?></p>
+    <?php if (($ajustes ?? []) !== []): ?>
+        <h2>Adendas registradas</h2>
+        <table>
+            <thead><tr><th>Código</th><th>Fecha</th><th>Tipo</th><th>Motivo</th><th>Impacto</th></tr></thead>
+            <tbody>
+                <?php foreach ($ajustes as $ajuste): ?>
+                    <tr>
+                        <td><?= esc($ajuste['codigo'] ?: 'ADE-' . $ajuste['id']) ?></td>
+                        <td><?= esc(! empty($ajuste['creado_en']) ? date('d/m/Y', strtotime($ajuste['creado_en'])) : 'Sin fecha') ?></td>
+                        <td><?= esc(ucfirst((string) $ajuste['tipo'])) ?></td>
+                        <td><?= esc($ajuste['motivo']) ?></td>
+                        <td>S/ <?= number_format((float) ($ajuste['impacto_financiero'] ?? 0), 2) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        <p class="total">Monto vigente: S/ <?= number_format((float) ($montoVigente ?? $contrato['monto_total']), 2) ?></p>
+    <?php endif; ?>
 
     <h2>Programación</h2>
     <?php if ($contrato['agenda'] === []): ?>

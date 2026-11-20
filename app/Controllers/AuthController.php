@@ -2,14 +2,16 @@
 
 namespace App\Controllers;
 
-use App\Controllers\BaseController;
 use Config\Database;
 
 class AuthController extends BaseController
 {
+    private const MAX_LOGIN_ATTEMPTS = 5;
+    private const LOGIN_WINDOW_SECONDS = 300;
+
     public function login()
     {
-        if (session()->get('logged_in')) {
+        if (session()->get('logged_in') === true) {
             return redirect()->to(base_url('admin/dashboard'));
         }
 
@@ -18,64 +20,63 @@ class AuthController extends BaseController
 
     public function processLogin()
     {
-        $session = session();
-        $db = Database::connect();
+        $username = trim((string) $this->request->getPost('username'));
+        $password = (string) $this->request->getPost('password');
 
-        $username = $this->request->getPost('username');
-        $password = $this->request->getPost('password');
-
-        // Busca en la tabla 'usuarios' por el campo 'usuario'
-        $user = $db->table('usuarios')->where('usuario', $username)->get()->getRowArray();
-
-        if ($user) {
-            $passwordHash = $user['password_hash'] ?? $user['password'] ?? '';
-            $activo = $user['activo'] ?? $user['estado'] ?? 1;
-
-            if ((int) $activo === 0) {
-                return redirect()->to('/login')->with('error', 'El usuario se encuentra inactivo.');
-            }
-
-            if (is_string($passwordHash) && password_verify((string) $password, $passwordHash)) {
-                $session->regenerate(true);
-
-                $userId = (int) ($user['id'] ?? $user['usuario_id'] ?? 0);
-                if ($userId > 0) {
-                    $db->table('usuarios')->where($db->fieldExists('id', 'usuarios') ? 'id' : 'usuario_id', $userId)->update([
-                        'ultimo_acceso' => date('Y-m-d H:i:s'),
-                    ]);
-                }
-
-                $nombre = $user['nombre'] ?? $user['usuario'];
-                if (empty($user['nombre']) && ! empty($user['personal_id']) && $db->tableExists('personal')) {
-                    $personal = $db->table('personal')->where('id', $user['personal_id'])->get()->getRowArray();
-                    $nombre = $personal['nombre'] ?? $nombre;
-                }
-
-                $permisos = json_decode($user['permisos_json'] ?? 'null', true);
-                $sessionData = [
-                    'id_usuario' => $userId,
-                    'usuario'    => $user['usuario'],
-                    'username'   => $user['usuario'],
-                    'nombre'     => $nombre,
-                    'cargo'      => $user['cargo'] ?? '',
-                    'rol'        => $user['rol'],
-                    'permisos'   => is_array($permisos) ? $permisos : null,
-                    'isLoggedIn' => true,
-                    'logged_in'  => true,
-                ];
-                $session->set($sessionData);
-
-                return redirect()->to(base_url('admin/dashboard'));
-            }
+        if ($username === '' || $password === '') {
+            return redirect()->to('/login')->with('error', 'Usuario o contraseña incorrectos.');
         }
 
-        // Credenciales incorrectas
-        return redirect()->to('/login')->with('error', 'Usuario o contraseña incorrectos.');
+        $throttler = service('throttler');
+        $throttleKey = 'login-' . md5(strtolower($username) . '|' . $this->request->getIPAddress());
+
+        if ($throttler->check($throttleKey, self::MAX_LOGIN_ATTEMPTS, self::LOGIN_WINDOW_SECONDS) === false) {
+            return redirect()->to('/login')
+                ->with('error', 'Demasiados intentos. Espera unos minutos antes de volver a intentarlo.');
+        }
+
+        $db = Database::connect();
+        $user = $db->table('usuarios')->where('usuario', $username)->get()->getRowArray();
+
+        if ($user === null || ! password_verify($password, (string) ($user['password_hash'] ?? ''))) {
+            return redirect()->to('/login')->with('error', 'Usuario o contraseña incorrectos.');
+        }
+
+        if ((int) ($user['activo'] ?? 0) !== 1) {
+            return redirect()->to('/login')->with('error', 'El usuario se encuentra inactivo.');
+        }
+
+        $throttler->remove($throttleKey);
+        session()->regenerate(true);
+
+        $userId = (int) ($user['id'] ?? 0);
+        if ($userId > 0) {
+            $db->table('usuarios')->where('id', $userId)->update([
+                'ultimo_acceso' => date('Y-m-d H:i:s'),
+            ]);
+        }
+
+        $permisos = json_decode((string) ($user['permisos_json'] ?? 'null'), true);
+
+        session()->set([
+            'id_usuario' => $userId,
+            'usuario'    => $user['usuario'],
+            'username'   => $user['usuario'],
+            'nombre'     => ($user['nombre'] ?? '') !== '' ? $user['nombre'] : $user['usuario'],
+            'cargo'      => $user['cargo'] ?? '',
+            'rol'        => $user['rol'],
+            'permisos'   => is_array($permisos) ? $permisos : null,
+            'isLoggedIn' => true,
+            'logged_in'  => true,
+        ]);
+
+        return redirect()->to(base_url('admin/dashboard'));
     }
 
     public function logout()
     {
         session()->destroy();
+
         return redirect()->to('/login');
     }
 }

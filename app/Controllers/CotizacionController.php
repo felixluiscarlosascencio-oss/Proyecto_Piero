@@ -3,8 +3,11 @@
 namespace App\Controllers;
 
 use App\Libraries\AdminAccess;
+use App\Libraries\CatalogoServicios;
+use App\Libraries\DocumentoCodigo;
 use App\Models\CotizacionModel;
 use App\Models\ServicioModel;
+use App\Models\SolicitudAdminModel;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Throwable;
@@ -13,45 +16,83 @@ class CotizacionController extends BaseController
 {
     public function index()
     {
-        if (! AdminAccess::can('cotizaciones.ver')) {
-            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No tienes permisos para ver cotizaciones.');
-        }
-
-        $cotizaciones = (new CotizacionModel())
-            ->select('solicitudes_cotizacion.*, contratos.id AS contrato_id')
-            ->join('contratos', 'contratos.cotizacion_id = solicitudes_cotizacion.id', 'left')
-            ->where('solicitudes_cotizacion.estado !=', CotizacionModel::ESTADO_REEMPLAZADA)
-            ->orderBy('solicitudes_cotizacion.created_at', 'ASC')
-            ->orderBy('solicitudes_cotizacion.id', 'ASC')
-            ->findAll();
-
-        return view('admin/cotizaciones/index', [
-            'cotizaciones' => $cotizaciones,
-            'vigentes'     => false,
-            'puedeCrear'   => AdminAccess::isAdmin(),
-        ]);
+        return $this->listar(false);
     }
 
     public function vigentes()
     {
+        return $this->listar(true);
+    }
+
+    private function listar(bool $soloVigentes)
+    {
         if (! AdminAccess::can('cotizaciones.ver')) {
-            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No tienes permisos para ver cotizaciones.');
+            return $this->sinPermiso('No tienes permisos para ver cotizaciones.');
         }
 
-        $cotizaciones = (new CotizacionModel())
-            ->where('estado', CotizacionModel::ESTADO_PENDIENTE)
+        $db = db_connect();
+        $query = $db->table('solicitudes_cotizacion s')
+            ->select('s.*, c.id AS contrato_id, c.codigo AS contrato_codigo, c.estado_contrato')
+            ->join('contratos c', 'c.cotizacion_id = s.id', 'left')
+            ->where('s.estado !=', CotizacionModel::ESTADO_REEMPLAZADA)
             ->groupStart()
-                ->where('vence_en', null)
-                ->orWhere('vence_en >=', date('Y-m-d H:i:s'))
-            ->groupEnd()
-            ->orderBy('created_at', 'ASC')
-            ->orderBy('id', 'ASC')
-            ->findAll();
+                ->where('s.codigo_cotizacion', null)
+                ->orWhere('s.version = (SELECT MAX(v.version) FROM solicitudes_cotizacion v WHERE v.codigo_cotizacion = s.codigo_cotizacion)', null, false)
+            ->groupEnd();
+
+        if ($soloVigentes) {
+            $query->groupStart()
+                ->where('s.estado', CotizacionModel::ESTADO_ACEPTADA)
+                ->orGroupStart()
+                    ->where('s.estado', CotizacionModel::ESTADO_ENVIADA)
+                    ->groupStart()
+                        ->where('s.vence_en', null)
+                        ->orWhere('s.vence_en >=', date('Y-m-d H:i:s'))
+                    ->groupEnd()
+                ->groupEnd()
+            ->groupEnd();
+        }
+
+        $texto = trim((string) ($this->request->getGet('q') ?? ''));
+        if ($texto !== '') {
+            $query->groupStart()
+                ->like('s.nombre_colegio', $texto)
+                ->orLike('s.persona_encargada', $texto)
+                ->orLike('s.telefono_contacto', $texto)
+                ->orLike('s.codigo_solicitud', $texto)
+                ->orLike('s.codigo_cotizacion', $texto)
+            ->groupEnd();
+        }
+
+        $filtroEstado = (string) ($this->request->getGet('estado') ?? '');
+        $this->aplicarFiltroEstado($query, $filtroEstado, 's');
+
+        $total = (int) $query->countAllResults(false);
+        $porPagina = 20;
+        $pagina = max(1, (int) ($this->request->getGet('pagina') ?? 1));
+        $totalPaginas = max(1, (int) ceil($total / $porPagina));
+        $pagina = min($pagina, $totalPaginas);
+
+        $query->orderBy('s.created_at', 'DESC')->orderBy('s.id', 'DESC')
+            ->limit($porPagina, ($pagina - 1) * $porPagina);
+        $cotizaciones = $query->get()->getResultArray();
+        foreach ($cotizaciones as &$cotizacion) {
+            $cotizacion['servicios'] = json_decode((string) $cotizacion['servicios_json'], true) ?: [];
+            $cotizacion['estado_efectivo'] = CotizacionModel::estadoEfectivo($cotizacion);
+            $cotizacion['codigo_visible'] = CotizacionModel::codigoVisible($cotizacion);
+            $cotizacion['es_formal'] = CotizacionModel::esCotizacionFormal($cotizacion);
+        }
+        unset($cotizacion);
 
         return view('admin/cotizaciones/index', [
             'cotizaciones' => $cotizaciones,
-            'vigentes'     => true,
+            'vigentes'     => $soloVigentes,
             'puedeCrear'   => AdminAccess::isAdmin(),
+            'texto'        => $texto,
+            'filtroEstado' => $filtroEstado,
+            'total'        => $total,
+            'pagina'       => $pagina,
+            'totalPaginas' => $totalPaginas,
         ]);
     }
 
@@ -64,6 +105,7 @@ class CotizacionController extends BaseController
         return view('admin/cotizaciones/nueva', [
             'serviciosCatalogo' => $this->catalogoServicios(),
             'duplicada' => null,
+            'siguienteVersion' => 1,
         ]);
     }
 
@@ -77,8 +119,17 @@ class CotizacionController extends BaseController
         if ($cotizacion === null) {
             return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se encontró la cotización que deseas duplicar.');
         }
-        if ($cotizacion['estado'] === CotizacionModel::ESTADO_REEMPLAZADA) {
+        if (! CotizacionModel::esCotizacionFormal($cotizacion)) {
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
+                ->with('error', 'Primero genera la cotización formal y define sus precios.');
+        }
+        if ($cotizacion['estado'] === CotizacionModel::ESTADO_REEMPLAZADA
+            || $cotizacion['estado'] === CotizacionModel::ESTADO_CONVERTIDA) {
             return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo puedes crear una versión nueva a partir de la cotización vigente.');
+        }
+        if ($this->contratoDeCodigo((string) $cotizacion['codigo_cotizacion']) !== null) {
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
+                ->with('error', 'La cotización ya generó un contrato; no se pueden crear nuevas versiones.');
         }
 
         $servicios = json_decode((string) $cotizacion['servicios_json'], true);
@@ -93,6 +144,7 @@ class CotizacionController extends BaseController
         return view('admin/cotizaciones/nueva', [
             'serviciosCatalogo' => $this->catalogoServicios(),
             'duplicada' => $cotizacion,
+            'siguienteVersion' => $this->siguienteVersion((string) $cotizacion['codigo_cotizacion']),
         ]);
     }
 
@@ -127,28 +179,33 @@ class CotizacionController extends BaseController
             && ($duplicarDe === false || $duplicarDe < 1)) {
             return redirect()->back()->withInput()->with('error', 'La cotización de origen no es válida.');
         }
+
+        $origen = null;
+        $codigoCotizacion = null;
         $rootId = null;
         if ($duplicarDe !== false && $duplicarDe > 0) {
-            $cotizacionOrigen = (new CotizacionModel())->find($duplicarDe);
-            if ($cotizacionOrigen === null || $cotizacionOrigen['estado'] === CotizacionModel::ESTADO_REEMPLAZADA) {
+            $origen = (new CotizacionModel())->find($duplicarDe);
+            if ($origen === null || $origen['estado'] === CotizacionModel::ESTADO_REEMPLAZADA) {
                 return redirect()->back()->withInput()->with('error', 'Solo puedes crear una versión nueva a partir de la cotización vigente.');
             }
-            $serviciosOrigen = json_decode((string) $cotizacionOrigen['servicios_json'], true);
-            $servicios = $this->serviciosClonados(
+            if (! CotizacionModel::esCotizacionFormal($origen)) {
+                return redirect()->back()->withInput()->with('error', 'Primero genera la cotización formal desde la solicitud.');
+            }
+            if ($this->contratoDeCodigo((string) $origen['codigo_cotizacion']) !== null) {
+                return redirect()->back()->withInput()->with('error', 'La cotización ya tiene un contrato y no admite nuevas versiones.');
+            }
+
+            $serviciosOrigen = json_decode((string) $origen['servicios_json'], true);
+            $servicios = (new CatalogoServicios())->clonados(
                 $serviciosOrigen,
                 $this->request->getPost('servicios'),
                 $this->request->getPost('precios')
             );
-            $rootId = (int) ($cotizacionOrigen['cotizacion_origen_id'] ?? 0);
-            $rootId = $rootId > 0 ? $rootId : (int) $cotizacionOrigen['id'];
-            if ($rootId !== (int) $cotizacionOrigen['id']
-                && (new CotizacionModel())->find($rootId) === null) {
-                log_message('error', 'Quote #' . $duplicarDe . ' references missing version root #' . $rootId);
-
-                return redirect()->back()->withInput()->with('error', 'No se pudo identificar el historial de esta cotización.');
-            }
+            $codigoCotizacion = (string) $origen['codigo_cotizacion'];
+            $rootId = (int) ($origen['cotizacion_origen_id'] ?? 0);
+            $rootId = $rootId > 0 ? $rootId : (int) $origen['id'];
         } else {
-            $servicios = $this->serviciosSeleccionados(
+            $servicios = (new CatalogoServicios())->paraCotizacion(
                 $this->request->getPost('servicios'),
                 $this->request->getPost('precios')
             );
@@ -164,50 +221,51 @@ class CotizacionController extends BaseController
             return redirect()->back()->withInput()->with('error', 'El total de la cotización supera el máximo permitido.');
         }
 
-        $model = new CotizacionModel();
-        $registro = [
-            'nombre_colegio'       => $datos['nombre_colegio'],
-            'nombre_seccion'       => $datos['nombre_seccion'] !== '' ? $datos['nombre_seccion'] : null,
-            'persona_encargada'    => $datos['persona_encargada'],
-            'telefono_contacto'    => $datos['telefono_contacto'],
-            'cantidad_estudiantes' => $cantidad,
-            'servicios_json'       => json_encode($servicios, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
-            'precio_unitario'      => $precioUnitario,
-            'total_seccion'        => $total,
-            'estado'               => CotizacionModel::ESTADO_APROBADA_ADMIN,
-            'aprobado_por'         => (int) session()->get('id_usuario'),
-        ];
-        if ($rootId !== null) {
-            $registro['cotizacion_origen_id'] = $rootId;
-        }
-
         $db = db_connect();
         $db->transBegin();
         try {
-            $id = $model->insert($registro);
-            if (! $id) {
-                throw new \RuntimeException('The new quote version could not be saved.');
+            if ($codigoCotizacion === null) {
+                $codigoCotizacion = DocumentoCodigo::siguiente(DocumentoCodigo::COT);
+                $version = 1;
+            } else {
+                $version = $this->siguienteVersion($codigoCotizacion);
             }
+
+            $registro = [
+                'nombre_colegio'       => $datos['nombre_colegio'],
+                'nombre_seccion'       => $datos['nombre_seccion'] !== '' ? $datos['nombre_seccion'] : null,
+                'persona_encargada'    => $datos['persona_encargada'],
+                'telefono_contacto'    => $datos['telefono_contacto'],
+                'cantidad_estudiantes' => $cantidad,
+                'servicios_json'       => json_encode($servicios, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+                'precio_unitario'      => $precioUnitario,
+                'total_seccion'        => $total,
+                'estado'               => CotizacionModel::ESTADO_BORRADOR,
+                'estado_revision'      => CotizacionModel::REVISION_REVISADA,
+                'codigo_cotizacion'    => $codigoCotizacion,
+                'version'              => $version,
+                'aprobado_por'         => (int) session()->get('id_usuario'),
+            ];
             if ($rootId !== null) {
-                $updated = $db->table('solicitudes_cotizacion')
-                    ->where('id !=', $id)
-                    ->groupStart()
-                        ->where('id', $rootId)
-                        ->orWhere('cotizacion_origen_id', $rootId)
-                    ->groupEnd()
-                    ->update([
-                        'estado' => CotizacionModel::ESTADO_REEMPLAZADA,
-                        'updated_at' => date('Y-m-d H:i:s'),
-                    ]);
-                if (! $updated || $db->transStatus() === false) {
-                    throw new \RuntimeException('Previous quote versions could not be marked as historical.');
-                }
+                $registro['cotizacion_origen_id'] = $rootId;
             }
+
+            $id = (int) (new CotizacionModel())->insert($registro);
+            if ($id < 1) {
+                throw new \RuntimeException('The new quote could not be saved.');
+            }
+
+            $this->registrarEvento($db, 'cotizacion_creada', $id, null, [
+                'codigo'  => $codigoCotizacion,
+                'version' => $version,
+                'origen'  => $origen['id'] ?? null,
+            ]);
+
             if ($db->transStatus() === false) {
                 throw new \RuntimeException('The quote transaction failed.');
             }
             $db->transCommit();
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             $db->transRollback();
             log_message('error', 'Failed to save quote version' . ($duplicarDe ? ' from #' . $duplicarDe : '') . ': ' . $exception->getMessage());
 
@@ -215,73 +273,106 @@ class CotizacionController extends BaseController
         }
 
         return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
-            ->with('mensaje', $rootId !== null
-                ? 'Nueva versión creada. La anterior quedó en el historial y esta es la versión vigente.'
-                : 'Cotización creada. Ya puedes pasarla a vigente o a contrato.');
+            ->with('mensaje', $origen !== null
+                ? 'Versión ' . $version . ' creada. Las versiones anteriores se conservan en el historial.'
+                : 'Cotización ' . $codigoCotizacion . ' creada. Revisa sus datos y envíala al cliente.');
     }
 
     public function ver(int $id)
     {
         if (! AdminAccess::can('cotizaciones.ver')) {
-            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No tienes permisos para ver cotizaciones.');
+            return $this->sinPermiso('No tienes permisos para ver cotizaciones.');
         }
 
-        $cotizacion = (new CotizacionModel())->find($id);
+        $model = new CotizacionModel();
+        $cotizacion = $model->find($id);
         if ($cotizacion === null) {
             return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se encontró la solicitud.');
         }
 
-        $cotizacion['servicios'] = json_decode($cotizacion['servicios_json'], true);
+        $cotizacion['servicios'] = json_decode((string) $cotizacion['servicios_json'], true);
         if (! is_array($cotizacion['servicios'])) {
             log_message('error', 'Invalid service data in quote #' . $id);
 
             return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se pudieron leer los servicios de la cotización.');
         }
-        $contrato = db_connect()->table('contratos')
-            ->select('id')
-            ->where('cotizacion_id', $id)
-            ->get()
-            ->getRowArray();
-        $rootId = (int) ($cotizacion['cotizacion_origen_id'] ?? 0);
-        $rootId = $rootId > 0 ? $rootId : $id;
-        $versiones = db_connect()->table('solicitudes_cotizacion')
-            ->groupStart()
-                ->where('id', $rootId)
-                ->orWhere('cotizacion_origen_id', $rootId)
-            ->groupEnd()
-            ->orderBy('created_at', 'ASC')
-            ->orderBy('id', 'ASC')
-            ->get()
-            ->getResultArray();
-        $ultimaVersionId = $versiones === [] ? 0 : (int) $versiones[array_key_last($versiones)]['id'];
-        $idsVersiones = array_map('intval', array_column($versiones, 'id'));
-        $volverA = filter_var($this->request->getGet('volver'), FILTER_VALIDATE_INT);
-        $urlVolver = base_url('admin/cotizaciones');
-        $textoVolver = 'Volver a cotizaciones';
-        if ($volverA !== false && $volverA !== null && $volverA > 0
-            && $volverA !== $id && in_array($volverA, $idsVersiones, true)) {
-            $urlVolver = base_url('admin/cotizaciones/' . $volverA . '/ver');
-            $textoVolver = 'Volver al historial de cotizaciones';
-        }
-        $historial = array_values(array_filter(
-            $versiones,
-            static fn (array $version): bool => (int) $version['id'] !== $id && (int) $version['id'] !== $ultimaVersionId
-        ));
-        foreach ($historial as &$version) {
-            $version['servicios'] = json_decode((string) $version['servicios_json'], true);
-            if (! is_array($version['servicios'])) {
-                $version['servicios'] = [];
+
+        $db = db_connect();
+        $formal = CotizacionModel::esCotizacionFormal($cotizacion);
+        $codigo = (string) ($cotizacion['codigo_cotizacion'] ?? '');
+        $contrato = $formal ? $this->contratoDeCodigo($codigo, true) : null;
+
+        $versiones = [];
+        if ($formal) {
+            $versiones = $db->table('solicitudes_cotizacion')
+                ->where('codigo_cotizacion', $codigo)
+                ->orderBy('version', 'ASC')
+                ->orderBy('id', 'ASC')
+                ->get()
+                ->getResultArray();
+            foreach ($versiones as &$version) {
+                $version['servicios'] = json_decode((string) $version['servicios_json'], true) ?: [];
+                $version['estado_efectivo'] = CotizacionModel::estadoEfectivo($version);
             }
+            unset($version);
+        }
+
+        $usuarios = [];
+        foreach ($db->table('usuarios u')
+            ->select('u.id, u.usuario, p.nombre')
+            ->join('personal p', 'p.id = u.personal_id', 'left')
+            ->get()
+            ->getResultArray() as $usuario) {
+            $usuarios[(int) $usuario['id']] = trim((string) ($usuario['nombre'] ?: $usuario['usuario']));
+        }
+        $responsable = static function (array $fila) use ($usuarios): string {
+            $id = (int) ($fila['aprobado_por'] ?? 0);
+            if (isset($usuarios[$id])) {
+                return $usuarios[$id];
+            }
+            $id = (int) ($fila['respondido_por'] ?? 0);
+
+            return $usuarios[$id] ?? 'Sin responsable';
+        };
+        $cotizacion['responsable'] = $responsable($cotizacion);
+        foreach ($versiones as &$version) {
+            $version['responsable'] = $responsable($version);
         }
         unset($version);
 
+        $ultimaVersionId = $versiones === [] ? (int) $cotizacion['id'] : (int) $versiones[array_key_last($versiones)]['id'];
+        $esUltimaVersion = (int) $cotizacion['id'] === $ultimaVersionId;
+        $estadoEfectivo = CotizacionModel::estadoEfectivo($cotizacion);
+        $administrador = AdminAccess::isAdmin();
+
         return view('admin/cotizaciones/detalle', [
-            'cotizacion' => $cotizacion,
-            'contratoId' => $contrato['id'] ?? null,
-            'historial' => $historial,
-            'ultimaVersionId' => $ultimaVersionId,
-            'urlVolver' => $urlVolver,
-            'textoVolver' => $textoVolver,
+            'cotizacion'         => $cotizacion,
+            'contrato'           => $contrato,
+            'versiones'          => $versiones,
+            'ultimaVersionId'    => $ultimaVersionId,
+            'esUltimaVersion'    => $esUltimaVersion,
+            'esSolicitud'        => ! $formal,
+            'estadoEfectivo'     => $estadoEfectivo,
+            'administrador'      => $administrador,
+            'puedeEditarPrecios' => $administrador && ! $formal
+                && (float) $cotizacion['precio_unitario'] <= 0
+                && $cotizacion['servicios'] !== [],
+            'puedeMarcarRevision' => $administrador && ! $formal
+                && $cotizacion['estado_revision'] !== CotizacionModel::REVISION_REVISADA,
+            'puedeCrearVersion'  => $administrador && $formal && $esUltimaVersion
+                && $contrato === null
+                && ! in_array($cotizacion['estado'], [CotizacionModel::ESTADO_REEMPLAZADA, CotizacionModel::ESTADO_CONVERTIDA], true),
+            'puedeActivar'       => $administrador && $formal
+                && $cotizacion['estado'] === CotizacionModel::ESTADO_BORRADOR
+                && (float) $cotizacion['total_seccion'] > 0,
+            'puedeResponder'     => $administrador && $formal && $esUltimaVersion
+                && in_array($estadoEfectivo, [CotizacionModel::ESTADO_ENVIADA, CotizacionModel::ESTADO_VENCIDA], true),
+            'puedePasarContrato' => $administrador && $formal
+                && $cotizacion['estado'] === CotizacionModel::ESTADO_ACEPTADA
+                && $contrato === null,
+            'puedeDescargarPdf'  => $formal && (float) $cotizacion['total_seccion'] > 0,
+            'puedeEliminar'      => $this->puedeEliminar($cotizacion, $formal, $codigo),
+            'eventos'            => $this->eventosDe($db, $id, $contrato['id'] ?? null),
         ]);
     }
 
@@ -294,12 +385,14 @@ class CotizacionController extends BaseController
         $model = new CotizacionModel();
         $cotizacion = $model->find($id);
         if ($cotizacion === null
-            || $cotizacion['estado'] !== CotizacionModel::ESTADO_SOLICITUD
+            || CotizacionModel::esCotizacionFormal($cotizacion)
+            || $cotizacion['estado'] !== CotizacionModel::ESTADO_BORRADOR
             || (float) $cotizacion['precio_unitario'] > 0) {
-            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se pueden actualizar los precios de esta cotización.');
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
+                ->with('error', 'Esta cotización ya fue generada. Usa una nueva versión para cambiar sus precios.');
         }
 
-        $servicios = json_decode($cotizacion['servicios_json'], true);
+        $servicios = json_decode((string) $cotizacion['servicios_json'], true);
         $precios = $this->request->getPost('precios');
         if (! is_array($servicios) || $servicios === [] || ! is_array($precios)) {
             return redirect()->back()->withInput()->with('error', 'No se pudieron leer los servicios y precios ingresados.');
@@ -330,26 +423,64 @@ class CotizacionController extends BaseController
             return redirect()->back()->withInput()->with('error', 'El total de la cotización supera el máximo permitido.');
         }
 
-        $actualizado = db_connect()->table('solicitudes_cotizacion')
-            ->where('id', $id)
-            ->where('estado', CotizacionModel::ESTADO_SOLICITUD)
-            ->where('precio_unitario <=', 0)
-            ->update([
-                'servicios_json'  => json_encode($servicios, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
-                'precio_unitario' => $precioUnitario,
-                'total_seccion'   => $total,
-                'estado'          => CotizacionModel::ESTADO_APROBADA_ADMIN,
-                'updated_at'      => date('Y-m-d H:i:s'),
-            ]);
-        if (! $actualizado || db_connect()->affectedRows() !== 1) {
-            log_message('error', 'Failed to lock initial prices for quote #' . $id);
+        $db = db_connect();
+        $db->transBegin();
+        try {
+            $codigo = DocumentoCodigo::siguiente(DocumentoCodigo::COT);
+            $actualizado = $db->table('solicitudes_cotizacion')
+                ->where('id', $id)
+                ->where('codigo_cotizacion', null)
+                ->where('estado', CotizacionModel::ESTADO_BORRADOR)
+                ->where('precio_unitario <=', 0)
+                ->update([
+                    'servicios_json'    => json_encode($servicios, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+                    'precio_unitario'   => $precioUnitario,
+                    'total_seccion'     => $total,
+                    'codigo_cotizacion' => $codigo,
+                    'version'           => 1,
+                    'estado'            => CotizacionModel::ESTADO_BORRADOR,
+                    'estado_revision'   => CotizacionModel::REVISION_REVISADA,
+                    'updated_at'        => date('Y-m-d H:i:s'),
+                ]);
+            if (! $actualizado || $db->affectedRows() !== 1) {
+                throw new \RuntimeException('The quote was already priced by another request.');
+            }
+            $this->registrarEvento($db, 'cotizacion_generada', $id, null, ['codigo' => $codigo]);
+            if ($db->transStatus() === false) {
+                throw new \RuntimeException('Transaction failed while pricing the quote.');
+            }
+            $db->transCommit();
+        } catch (Throwable $exception) {
+            $db->transRollback();
+            log_message('error', 'Failed to lock initial prices for quote #' . $id . ': ' . $exception->getMessage());
 
             return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
                 ->with('error', 'La cotización ya se guardó o no se pudo actualizar; no se modificaron sus precios.');
         }
 
         return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
-            ->with('mensaje', 'Cotización guardada. Sus precios quedaron bloqueados; usa una nueva versión para realizar cambios.');
+            ->with('mensaje', 'Cotización ' . $codigo . ' generada. Sus precios quedaron bloqueados; usa una nueva versión para cambios.');
+    }
+
+    public function marcarEnRevision(int $id)
+    {
+        if (! AdminAccess::isAdmin()) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No tienes permiso para cambiar la revisión.');
+        }
+
+        $model = new CotizacionModel();
+        $cotizacion = $model->find($id);
+        if ($cotizacion === null || CotizacionModel::esCotizacionFormal($cotizacion)) {
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))->with('error', 'La solicitud ya no está pendiente de revisión.');
+        }
+        if ($cotizacion['estado_revision'] === CotizacionModel::REVISION_REVISADA) {
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))->with('mensaje', 'La solicitud ya fue revisada.');
+        }
+
+        $model->update($id, ['estado_revision' => CotizacionModel::REVISION_EN_REVISION]);
+        $this->registrarEvento(db_connect(), 'revision_iniciada', $id, null, []);
+
+        return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))->with('mensaje', 'Solicitud marcada en revisión.');
     }
 
     public function eliminar(int $id)
@@ -363,19 +494,13 @@ class CotizacionController extends BaseController
         if ($cotizacion === null) {
             return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se encontró la cotización.');
         }
-        if ($cotizacion['estado'] === CotizacionModel::ESTADO_REEMPLAZADA
-            || $cotizacion['cotizacion_origen_id'] !== null
-            || db_connect()->table('solicitudes_cotizacion')->where('cotizacion_origen_id', $id)->countAllResults() > 0) {
+        if (! $this->puedeEliminar($cotizacion, CotizacionModel::esCotizacionFormal($cotizacion), (string) ($cotizacion['codigo_cotizacion'] ?? ''))) {
             return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
-                ->with('error', 'Las versiones históricas vinculadas se conservan para auditoría y no se pueden eliminar.');
-        }
-
-        if (db_connect()->table('contratos')->where('cotizacion_id', $id)->countAllResults() > 0) {
-            return redirect()->to(base_url('admin/contratos'))->with('error', 'Una cotización convertida a contrato no se puede eliminar.');
+                ->with('error', 'Esta cotización tiene versiones o un contrato vinculado y debe conservarse para auditoría.');
         }
 
         if (! AdminAccess::isAdmin()) {
-            $guardada = (new \App\Models\SolicitudAdminModel())->insert([
+            $guardada = (new SolicitudAdminModel())->insert([
                 'entidad'        => 'cotizacion',
                 'entidad_id'     => $id,
                 'accion'         => 'eliminar',
@@ -400,17 +525,20 @@ class CotizacionController extends BaseController
     public function activar(int $id)
     {
         if (! AdminAccess::isAdmin()) {
-            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo el administrador puede activar la vigencia.');
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo el administrador puede enviar la cotización.');
         }
 
         $model = new CotizacionModel();
         $cotizacion = $model->find($id);
-        if ($cotizacion === null || ! in_array($cotizacion['estado'], [CotizacionModel::ESTADO_SOLICITUD, CotizacionModel::ESTADO_APROBADA_ADMIN], true)) {
-            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo se puede activar una cotización pendiente de vigencia.');
+        if ($cotizacion === null || ! CotizacionModel::esCotizacionFormal($cotizacion)) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Primero genera la cotización formal.');
+        }
+        if ($cotizacion['estado'] !== CotizacionModel::ESTADO_BORRADOR) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo se puede enviar una cotización en borrador.');
         }
         if ((float) $cotizacion['total_seccion'] <= 0 || (float) $cotizacion['total_seccion'] > 99999999.99) {
             return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
-                ->with('error', 'Configura los precios de cotización antes de activar esta cotización.');
+                ->with('error', 'Configura los precios de cotización antes de enviarla.');
         }
 
         $diasVigencia = filter_var($this->request->getPost('dias_vigencia'), FILTER_VALIDATE_INT);
@@ -418,56 +546,188 @@ class CotizacionController extends BaseController
             return redirect()->back()->withInput()->with('error', 'La vigencia debe ser de 1 a 365 días.');
         }
 
-        $venceEn = (new \DateTimeImmutable('today'))->modify('+' . $diasVigencia . ' days')->format('Y-m-d 23:59:59');
-        if (! $model->update($id, [
-            'estado'        => CotizacionModel::ESTADO_PENDIENTE,
-            'dias_vigencia' => $diasVigencia,
-            'vence_en'      => $venceEn,
-            'aprobado_por'  => (int) session()->get('id_usuario'),
-        ])) {
-            log_message('error', 'Failed to activate quote #' . $id . ': ' . json_encode($model->errors()));
+        $codigo = (string) $cotizacion['codigo_cotizacion'];
+        if ($this->contratoDeCodigo($codigo) !== null) {
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
+                ->with('error', 'La cotización ya tiene un contrato asociado.');
+        }
 
-            return redirect()->back()->with('error', 'No se pudo activar la vigencia de la cotización.');
+        $venceEn = (new \DateTimeImmutable('today'))->modify('+' . $diasVigencia . ' days')->format('Y-m-d 23:59:59');
+        $db = db_connect();
+        $db->transBegin();
+        try {
+            $db->table('solicitudes_cotizacion')
+                ->where('id', $id)
+                ->where('codigo_cotizacion', $codigo)
+                ->where('estado', CotizacionModel::ESTADO_BORRADOR)
+                ->update([
+                    'estado'          => CotizacionModel::ESTADO_ENVIADA,
+                    'dias_vigencia'   => $diasVigencia,
+                    'vence_en'        => $venceEn,
+                    'aprobado_por'    => (int) session()->get('id_usuario'),
+                    'estado_revision' => CotizacionModel::REVISION_REVISADA,
+                    'updated_at'      => date('Y-m-d H:i:s'),
+                ]);
+            if ($db->affectedRows() !== 1) {
+                throw new \RuntimeException('The quote changed while it was being sent.');
+            }
+
+            $db->table('solicitudes_cotizacion')
+                ->where('codigo_cotizacion', $codigo)
+                ->where('id !=', $id)
+                ->where('estado !=', CotizacionModel::ESTADO_REEMPLAZADA)
+                ->update([
+                    'estado'     => CotizacionModel::ESTADO_REEMPLAZADA,
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+
+            $this->registrarEvento($db, 'cotizacion_enviada', $id, null, [
+                'codigo' => $codigo,
+                'version' => (int) $cotizacion['version'],
+                'vence_en' => $venceEn,
+            ]);
+            if ($db->transStatus() === false) {
+                throw new \RuntimeException('Transaction failed while sending the quote.');
+            }
+            $db->transCommit();
+        } catch (Throwable $exception) {
+            $db->transRollback();
+            log_message('error', 'Failed to send quote #' . $id . ': ' . $exception->getMessage());
+
+            return redirect()->back()->with('error', 'No se pudo enviar la cotización.');
         }
 
         return redirect()->to(base_url('admin/cotizaciones/vigentes'))
-            ->with('mensaje', 'Cotización vigente hasta ' . date('d/m/Y', strtotime($venceEn)) . '.');
+            ->with('mensaje', 'Cotización ' . $codigo . ' enviada y vigente hasta ' . date('d/m/Y', strtotime($venceEn)) . '.');
+    }
+
+    public function aceptar(int $id)
+    {
+        return $this->responder($id, true);
+    }
+
+    public function rechazar(int $id)
+    {
+        return $this->responder($id, false);
+    }
+
+    private function responder(int $id, bool $aceptar)
+    {
+        if (! AdminAccess::isAdmin()) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo el administrador puede registrar la respuesta del cliente.');
+        }
+
+        $model = new CotizacionModel();
+        $cotizacion = $model->find($id);
+        if ($cotizacion === null || ! CotizacionModel::esCotizacionFormal($cotizacion)) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se encontró la cotización formal.');
+        }
+        $estadoEfectivo = CotizacionModel::estadoEfectivo($cotizacion);
+        if (! in_array($estadoEfectivo, [CotizacionModel::ESTADO_ENVIADA, CotizacionModel::ESTADO_VENCIDA], true)) {
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
+                ->with('error', 'Solo una cotización enviada puede registrarse como aceptada o rechazada.');
+        }
+        if ($cotizacion['cotizacion_origen_id'] !== null
+            && $this->esVersionReemplazadaSegura((int) $cotizacion['id'])) {
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
+                ->with('error', 'No se puede responder una versión histórica.');
+        }
+
+        $motivo = $this->postString('motivo_decision');
+        if (! $aceptar && (mb_strlen($motivo) < 5 || mb_strlen($motivo) > 1000)) {
+            return redirect()->back()->withInput()->with('error', 'Indica el motivo del rechazo (entre 5 y 1000 caracteres).');
+        }
+
+        $db = db_connect();
+        $db->transBegin();
+        try {
+            $db->table('solicitudes_cotizacion')
+                ->where('id', $id)
+                ->where('codigo_cotizacion', (string) $cotizacion['codigo_cotizacion'])
+                ->where('estado', CotizacionModel::ESTADO_ENVIADA)
+                ->update([
+                    'estado'          => $aceptar ? CotizacionModel::ESTADO_ACEPTADA : CotizacionModel::ESTADO_RECHAZADA,
+                    'respondido_en'   => date('Y-m-d H:i:s'),
+                    'respondido_por'  => (int) session()->get('id_usuario'),
+                    'motivo_decision' => $aceptar ? null : $motivo,
+                    'updated_at'      => date('Y-m-d H:i:s'),
+                ]);
+            if ($db->affectedRows() !== 1) {
+                throw new \RuntimeException('The quote was already answered by another request.');
+            }
+
+            $this->registrarEvento($db, $aceptar ? 'cotizacion_aceptada' : 'cotizacion_rechazada', $id, null, [
+                'codigo' => $cotizacion['codigo_cotizacion'],
+                'motivo' => $aceptar ? null : $motivo,
+            ]);
+            if ($db->transStatus() === false) {
+                throw new \RuntimeException('Transaction failed while answering the quote.');
+            }
+            $db->transCommit();
+        } catch (Throwable $exception) {
+            $db->transRollback();
+            log_message('error', 'Failed to answer quote #' . $id . ': ' . $exception->getMessage());
+
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
+                ->with('error', 'La cotización ya fue respondida o no se pudo registrar la respuesta.');
+        }
+
+        return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
+            ->with('mensaje', $aceptar ? 'Cotización aceptada. Ya puedes generar el contrato.' : 'Cotización rechazada.');
     }
 
     public function pasarAContrato(int $id)
     {
         if (! AdminAccess::isAdmin()) {
-            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo el administrador puede pasar una cotización a contrato.');
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo el administrador puede crear el contrato.');
         }
 
         $model = new CotizacionModel();
         $cotizacion = $model->find($id);
-        if ($cotizacion === null) {
-            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se encontró la solicitud.');
+        if ($cotizacion === null || ! CotizacionModel::esCotizacionFormal($cotizacion)) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No se encontró la cotización.');
         }
         if ($cotizacion['estado'] === CotizacionModel::ESTADO_REEMPLAZADA) {
             return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
-                ->with('error', 'No se puede crear un contrato desde una versión histórica de la cotización.');
+                ->with('error', 'No se puede crear un contrato desde una versión histórica.');
+        }
+        if ($cotizacion['estado'] !== CotizacionModel::ESTADO_ACEPTADA) {
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))
+                ->with('error', 'Solo una cotización aceptada por el cliente puede convertirse en contrato.');
         }
 
-        $db = db_connect();
-        $contratoExistente = $db->table('contratos')->select('id')->where('cotizacion_id', $id)->get()->getRowArray();
-        if ($contratoExistente !== null) {
-            return redirect()->to(base_url('admin/contratos/' . $contratoExistente['id']))
+        $existente = $this->contratoDeCodigo((string) $cotizacion['codigo_cotizacion']);
+        if ($existente !== null) {
+            return redirect()->to(base_url('admin/contratos/' . $existente['id']))
                 ->with('mensaje', 'Esta cotización ya tiene un contrato asociado.');
         }
 
-        $servicios = json_decode($cotizacion['servicios_json'], true);
+        $servicios = json_decode((string) $cotizacion['servicios_json'], true);
         if (! is_array($servicios) || $servicios === []) {
             return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))->with('error', 'La cotización no tiene servicios válidos para crear el contrato.');
         }
 
+        $db = db_connect();
         $db->transBegin();
         try {
+            $db->table('solicitudes_cotizacion')
+                ->where('id', $id)
+                ->where('codigo_cotizacion', (string) $cotizacion['codigo_cotizacion'])
+                ->where('estado', CotizacionModel::ESTADO_ACEPTADA)
+                ->update([
+                    'estado'     => CotizacionModel::ESTADO_CONVERTIDA,
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+            if ($db->affectedRows() !== 1) {
+                throw new \RuntimeException('The quote was converted by another request.');
+            }
+
             $institucionId = $this->obtenerInstitucionId($db, $cotizacion);
             $clienteId = $this->obtenerClienteId($db, $cotizacion);
+            $codigoContrato = DocumentoCodigo::siguiente(DocumentoCodigo::CON);
             $contratoInsertado = $db->table('contratos')->insert([
-                'numero_contrato'      => 'PP-' . date('Y') . '-' . str_pad((string) $id, 6, '0', STR_PAD_LEFT),
+                'codigo'               => $codigoContrato,
+                'numero_contrato'      => $codigoContrato,
                 'cotizacion_id'        => $id,
                 'institucion_id'       => $institucionId,
                 'cliente_id'           => $clienteId,
@@ -491,9 +751,12 @@ class CotizacionController extends BaseController
                 throw new \RuntimeException('The contract record could not be saved.');
             }
             $contratoId = (int) $db->insertID();
-            if ($contratoId < 1 || ! $model->update($id, ['estado' => CotizacionModel::ESTADO_APROBADO])) {
-                throw new \RuntimeException('The contract or source quote could not be saved.');
+            if ($contratoId < 1) {
+                throw new \RuntimeException('The contract could not be saved.');
             }
+            $this->registrarEvento($db, 'contrato_creado', $id, $contratoId, [
+                'codigo_contrato' => $codigoContrato,
+            ]);
             if ($db->transStatus() === false) {
                 throw new \RuntimeException('The database transaction failed.');
             }
@@ -502,32 +765,39 @@ class CotizacionController extends BaseController
             $db->transRollback();
             log_message('error', 'Failed to create contract from quote #' . $id . ': ' . $exception->getMessage());
 
-            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))->with('error', 'No se pudo crear el contrato.');
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))->with('error', 'No se pudo crear el contrato. Verifica que no exista ya uno para esta cotización.');
         }
 
         return redirect()->to(base_url('admin/contratos/' . $contratoId))
-            ->with('mensaje', 'Contrato creado con los datos de la solicitud. Completa sus datos formales y programación.');
+            ->with('mensaje', 'Contrato ' . $codigoContrato . ' creado a partir de la cotización aceptada.');
     }
 
     public function descargarPdf(int $id)
     {
-        if (! AdminAccess::isAdmin()) {
-            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo el administrador puede generar la cotización.');
+        if (! AdminAccess::can('cotizaciones.ver')) {
+            return $this->sinPermiso('No tienes permiso para descargar cotizaciones.');
         }
 
         $model = new CotizacionModel();
         $cotizacion = $model->find($id);
-        if ($cotizacion === null || $cotizacion['estado'] !== CotizacionModel::ESTADO_PENDIENTE) {
-            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'Solo las cotizaciones vigentes pueden generar un PDF.');
+        if ($cotizacion === null || ! CotizacionModel::esCotizacionFormal($cotizacion)) {
+            return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'La solicitud todavía no tiene una cotización formal en PDF.');
+        }
+        if ((float) $cotizacion['total_seccion'] <= 0) {
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))->with('error', 'La cotización no tiene precios definidos.');
         }
 
-        $diasVigencia = (int) $cotizacion['dias_vigencia'];
-        if ($diasVigencia < 1 || $diasVigencia > 365 || empty($cotizacion['vence_en'])) {
-            return redirect()->back()->with('error', 'La cotización no tiene una vigencia válida.');
+        try {
+            $cotizacion['servicios'] = json_decode((string) $cotizacion['servicios_json'], true, 512, JSON_THROW_ON_ERROR);
+        } catch (Throwable $exception) {
+            log_message('error', 'Invalid services in quote #' . $id . ': ' . $exception->getMessage());
+
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))->with('error', 'No se pudieron leer los servicios de la cotización.');
+        }
+        if (! is_array($cotizacion['servicios'])) {
+            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))->with('error', 'No se pudieron leer los servicios de la cotización.');
         }
 
-        $cotizacion['servicios'] = json_decode($cotizacion['servicios_json'], true, 512, JSON_THROW_ON_ERROR);
-        $cotizacion['dias_vigencia'] = $diasVigencia;
         $options = new Options();
         $options->set('isRemoteEnabled', false);
         $pdf = new Dompdf($options);
@@ -536,15 +806,14 @@ class CotizacionController extends BaseController
         $pdf->render();
         $contenidoPdf = $pdf->output();
 
-        if (! $model->update($id, ['pdf_generado_en' => date('Y-m-d H:i:s')])) {
-            log_message('error', 'Failed to mark generated PDF for quote #' . $id . ': ' . json_encode($model->errors()));
+        $model->update($id, ['pdf_generado_en' => date('Y-m-d H:i:s')]);
 
-            return redirect()->to(base_url('admin/cotizaciones/' . $id . '/ver'))->with('error', 'No se pudo guardar el estado del PDF.');
-        }
+        $nombre = preg_replace('/[^A-Za-z0-9._-]/', '-', (string) $cotizacion['codigo_cotizacion']);
+        $version = (int) ($cotizacion['version'] ?? 1);
 
         return $this->response
             ->setHeader('Content-Type', 'application/pdf')
-            ->setHeader('Content-Disposition', 'attachment; filename="cotizacion-' . $id . '.pdf"')
+            ->setHeader('Content-Disposition', 'attachment; filename="' . $nombre . '-v' . $version . '.pdf"')
             ->setBody($contenidoPdf);
     }
 
@@ -559,126 +828,148 @@ class CotizacionController extends BaseController
             ->findAll();
     }
 
-    /**
-     * @return list<array{servicio_id: int, nombre: string, descripcion: string, precio_unitario: float}>
-     */
-    private function serviciosSeleccionados($input, mixed $preciosInput): array
+    private function siguienteVersion(string $codigo): int
     {
-        if (! is_array($input)) {
-            return [];
-        }
+        $fila = db_connect()->table('solicitudes_cotizacion')
+            ->selectMax('version', 'maxima')
+            ->where('codigo_cotizacion', $codigo)
+            ->get()
+            ->getRowArray();
 
-        $ids = [];
-        foreach ($input as $value) {
-            $id = filter_var($value, FILTER_VALIDATE_INT);
-            if ($id === false || $id < 1) {
-                return [];
-            }
-            $ids[] = $id;
-        }
-        $ids = array_values(array_unique($ids));
-        if ($ids === [] || ! is_array($preciosInput)) {
-            return [];
-        }
-
-        $serviciosCatalogo = (new ServicioModel())
-            ->select('id, nombre_item, descripcion, precio_interno')
-            ->whereIn('id', $ids)
-            ->findAll();
-        if (count($serviciosCatalogo) !== count($ids)) {
-            return [];
-        }
-
-        $servicios = [];
-        foreach ($serviciosCatalogo as $servicio) {
-            $precio = $preciosInput[$servicio['id']] ?? $servicio['precio_interno'];
-            if ($precio === '') {
-                $precio = $servicio['precio_interno'];
-            }
-            $precioInterno = (float) $servicio['precio_interno'];
-            if (! is_numeric($precio)
-                || (float) $precio <= 0
-                || $precioInterno <= 0
-                || (float) $precio > $precioInterno) {
-                return [];
-            }
-            $servicios[] = [
-                'servicio_id'     => (int) $servicio['id'],
-                'nombre'          => (string) $servicio['nombre_item'],
-                'descripcion'     => (string) ($servicio['descripcion'] ?? ''),
-                'precio_interno'  => $precioInterno,
-                'precio_unitario' => round((float) $precio, 2),
-            ];
-        }
-
-        return $servicios;
+        return ((int) ($fila['maxima'] ?? 0)) + 1;
     }
 
     /**
-     * @param mixed $serviciosOrigen
-     * @param mixed $seleccion
-     * @param mixed $precios
+     * @return array<string, mixed>|null
+     */
+    private function contratoDeCodigo(string $codigo, bool $incluirEstado = false): ?array
+    {
+        if ($codigo === '') {
+            return null;
+        }
+
+        $select = 'c.id, c.codigo, c.numero_contrato' . ($incluirEstado ? ', c.estado_contrato, c.monto_total, c.creado_en' : '');
+        $fila = db_connect()->table('contratos c')
+            ->select($select)
+            ->join('solicitudes_cotizacion s', 's.id = c.cotizacion_id')
+            ->where('s.codigo_cotizacion', $codigo)
+            ->orderBy('c.id', 'ASC')
+            ->get()
+            ->getRowArray();
+
+        return $fila ?: null;
+    }
+
+    /**
+     * @param array<string, mixed> $cotizacion
+     */
+    private function puedeEliminar(array $cotizacion, bool $formal, string $codigo): bool
+    {
+        if (! AdminAccess::isAdmin() && ! AdminAccess::can('cotizaciones.eliminar')) {
+            return false;
+        }
+        if ($cotizacion['estado'] !== CotizacionModel::ESTADO_BORRADOR) {
+            return false;
+        }
+        if ($formal && $codigo !== '') {
+            if ($this->contratoDeCodigo($codigo) !== null) {
+                return false;
+            }
+            $versiones = db_connect()->table('solicitudes_cotizacion')
+                ->where('codigo_cotizacion', $codigo)
+                ->countAllResults();
+            if ($versiones > 1) {
+                return false;
+            }
+        } elseif ($cotizacion['cotizacion_origen_id'] !== null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function esVersionReemplazadaSegura(int $id): bool
+    {
+        $fila = db_connect()->table('solicitudes_cotizacion')->select('estado, version, codigo_cotizacion')
+            ->where('id', $id)->get()->getRowArray();
+        if ($fila === null) {
+            return true;
+        }
+        $maxima = db_connect()->table('solicitudes_cotizacion')->selectMax('version', 'maxima')
+            ->where('codigo_cotizacion', $fila['codigo_cotizacion'])->get()->getRowArray();
+
+        return $fila['estado'] === CotizacionModel::ESTADO_REEMPLAZADA
+            || (int) $fila['version'] < (int) ($maxima['maxima'] ?? 0);
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
-    private function serviciosClonados($serviciosOrigen, $seleccion, $precios): array
+    private function eventosDe(\CodeIgniter\Database\BaseConnection $db, int $cotizacionId, ?int $contratoId): array
     {
-        if (! is_array($serviciosOrigen) || ! is_array($seleccion)) {
-            return [];
+        $query = $db->table('eventos_comerciales')
+            ->groupStart()
+                ->where('cotizacion_id', $cotizacionId);
+        if ($contratoId !== null) {
+            $query->orWhere('contrato_id', $contratoId);
         }
+        $query->groupEnd();
 
-        $seleccionados = [];
-        $idsNuevos = [];
-        $idsOrigen = [];
-        foreach ($serviciosOrigen as $servicioOrigen) {
-            if (is_array($servicioOrigen) && isset($servicioOrigen['servicio_id'])) {
-                $idsOrigen[(string) $servicioOrigen['servicio_id']] = true;
-            }
+        return $query->orderBy('creado_en', 'DESC')->orderBy('id', 'DESC')->limit(25)->get()->getResultArray();
+    }
+
+    /**
+     * @param array<string, mixed> $detalle
+     */
+    private function registrarEvento(\CodeIgniter\Database\BaseConnection $db, string $tipo, ?int $cotizacionId, ?int $contratoId, array $detalle): void
+    {
+        $db->table('eventos_comerciales')->insert([
+            'cotizacion_id' => $cotizacionId,
+            'contrato_id'   => $contratoId,
+            'tipo'          => $tipo,
+            'detalle'       => $detalle === [] ? null : json_encode($detalle, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+            'usuario_id'    => (int) session()->get('id_usuario'),
+            'creado_en'     => date('Y-m-d H:i:s'),
+        ]);
+    }
+
+    private function aplicarFiltroEstado($query, string $estado, string $alias): void
+    {
+        switch ($estado) {
+            case 'sin_revisar':
+                $query->where($alias . '.estado_revision', CotizacionModel::REVISION_SIN_REVISAR);
+                break;
+            case 'en_revision':
+                $query->where($alias . '.estado_revision', CotizacionModel::REVISION_EN_REVISION);
+                break;
+            case 'revisadas':
+                $query->where($alias . '.estado_revision', CotizacionModel::REVISION_REVISADA);
+                break;
+            case 'aceptadas':
+                $query->whereIn($alias . '.estado', [CotizacionModel::ESTADO_ACEPTADA, CotizacionModel::ESTADO_CONVERTIDA]);
+                break;
+            case 'rechazadas':
+                $query->where($alias . '.estado', CotizacionModel::ESTADO_RECHAZADA);
+                break;
+            case 'borradores':
+                $query->where($alias . '.estado', CotizacionModel::ESTADO_BORRADOR);
+                break;
+            case 'convertidas':
+                $query->where($alias . '.estado', CotizacionModel::ESTADO_CONVERTIDA);
+                break;
+            case 'vencidas':
+                $query->where($alias . '.estado', CotizacionModel::ESTADO_ENVIADA)
+                    ->where($alias . '.vence_en IS NOT NULL', null, false)
+                    ->where($alias . '.vence_en <', date('Y-m-d H:i:s'));
+                break;
+            case 'vigentes':
+                $query->where($alias . '.estado', CotizacionModel::ESTADO_ENVIADA)
+                    ->groupStart()
+                        ->where($alias . '.vence_en', null)
+                        ->orWhere($alias . '.vence_en >=', date('Y-m-d H:i:s'))
+                    ->groupEnd();
+                break;
         }
-        foreach ($seleccion as $valor) {
-            if (! is_string($valor) && ! is_int($valor)) {
-                return [];
-            }
-            $valor = (string) $valor;
-            if (preg_match('/^origen-(\d+)$/', $valor, $coincidencia) === 1) {
-                $indice = (int) $coincidencia[1];
-                $servicio = $serviciosOrigen[$indice] ?? null;
-                if (! is_array($servicio)
-                    || ! is_string($servicio['nombre'] ?? null)
-                    || trim($servicio['nombre']) === ''
-                    || ! is_numeric($servicio['precio_unitario'] ?? null)
-                    || (float) $servicio['precio_unitario'] < 0
-                    || (float) $servicio['precio_unitario'] > 9999999999.99) {
-                    return [];
-                }
-                $seleccionados[] = $servicio;
-                continue;
-            }
-
-            $id = filter_var($valor, FILTER_VALIDATE_INT);
-            if ($id === false || $id < 1 || isset($idsOrigen[(string) $id])) {
-                return [];
-            }
-            $idsNuevos[] = $id;
-        }
-
-        $idsNuevos = array_values(array_unique($idsNuevos));
-        if ($idsNuevos !== []) {
-            if (! is_array($precios)) {
-                return [];
-            }
-            foreach ($idsNuevos as $id) {
-                if (! array_key_exists($id, $precios) || ! is_numeric($precios[$id])) {
-                    return [];
-                }
-            }
-            $nuevos = $this->serviciosSeleccionados($idsNuevos, $precios);
-            if (count($nuevos) !== count($idsNuevos)) {
-                return [];
-            }
-            $seleccionados = array_merge($seleccionados, $nuevos);
-        }
-
-        return $seleccionados;
     }
 
     /**

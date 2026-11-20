@@ -17,8 +17,11 @@ composer install
 php spark migrate
 ```
 
-Configura `app.baseURL` y las credenciales de base de datos en `.env`. El
-servidor web debe apuntar a `public/`.
+Configura las credenciales de base de datos en `.env`. La URL base se detecta
+automáticamente del dominio, proxy o túnel que recibe la petición, por lo que no
+debes fijar `localhost`. Solo para forzar una URL fija (por ejemplo en un dominio
+de producción) usa `app.autoDetectBaseURL = false` y `app.baseURL`. El servidor
+web debe apuntar a `public/`.
 
 ## Cotizaciones
 
@@ -68,24 +71,47 @@ contratos se reserva al rol `Dueno`.
 Los cambios estructurales están en las migraciones recientes; aplica las
 migraciones con `php spark migrate` antes de usar las nuevas funciones.
 
----------------------------------------
-ARCHIVO .env
+## Configuración del entorno
 
-CI_ENVIRONMENT = development
+Copia `.env.example` a `.env` y completa los valores. **Nunca subas `.env` al
+repositorio.**
 
-app.baseURL = 'http://localhost:8080/'
+Variables importantes:
 
-RECAPTCHA_SITE_KEY=6LfiZhsuAAAAAPheVeBsmWRlVTzv8c7QXtvN7Teq
-RECAPTCHA_SECRET_KEY=6LfiZhsuAAAAAKwh67jIGr0uDFFbo2e8gRd-dyW3
+```dotenv
+CI_ENVIRONMENT = production
 
-database.default.hostname = localhost
+# Dominio fijo en producción (recomendado). Si usas túneles/proxy, deja
+# autoDetectBaseURL activo y configura app.allowedHostnames si es posible.
+app.baseURL = 'https://tudominio.com/'
+app.autoDetectBaseURL = false
+
+RECAPTCHA_SITE_KEY = tu_site_key
+RECAPTCHA_SECRET_KEY = tu_secret_key
+
 database.default.database = database.db
-database.default.username = 
-database.default.password = 
 database.default.DBDriver = SQLite3
-database.default.DBPrefix = 
-database.default.pConnect = false
-database.default.DBDebug = true
-database.default.charset = utf8
-database.default.DBCollat = utf8_general_ci
-database.default.port = 3306
+database.default.DBDebug = false
+```
+
+Reglas de seguridad:
+
+- La `RECAPTCHA_SECRET_KEY` es privada: no la compartas ni la escribas en el
+  README, issues o capturas.
+- En producción usa `CI_ENVIRONMENT = production` y
+  `database.default.DBDebug = false`.
+- La base SQLite (`writable/database.db`) contiene datos reales y está excluida
+  de Git. Crea el esquema con `php spark migrate`.
+- Para el primer administrador ejecuta el seeder con una contraseña propia:
+
+```sh
+SEED_ADMIN_PASSWORD="una-contraseña-larga-y-unica" php spark db:seed UsuarioSeeder
+```
+
+## Despliegue
+
+1. `composer install --no-dev --optimize-autoloader`
+2. Copia `.env.example` a `.env` y configura producción.
+3. `php spark migrate`
+4. Apunta el servidor web a `public/`.
+5. Permisos de escritura solo para `writable/`.

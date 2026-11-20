@@ -11,7 +11,6 @@ class Home extends BaseController
         $recaptchaSiteKey = trim((string) env('RECAPTCHA_SITE_KEY'));
         $recaptchaSecretKey = trim((string) env('RECAPTCHA_SECRET_KEY'));
         $recaptchaConfigured = $recaptchaSiteKey !== '' && $recaptchaSecretKey !== '';
-        $recaptchaMisconfigured = ($recaptchaSiteKey !== '') !== ($recaptchaSecretKey !== '');
 
         return view('public/home', [
             'servicios' => (new ServicioModel())
@@ -19,7 +18,7 @@ class Home extends BaseController
                 ->orderBy('nombre_item', 'ASC')
                 ->findAll(),
             'recaptchaSiteKey' => $recaptchaConfigured ? $recaptchaSiteKey : '',
-            'recaptchaMisconfigured' => $recaptchaMisconfigured,
+            'recaptchaMisconfigured' => ! $recaptchaConfigured,
         ]);
     }
 }

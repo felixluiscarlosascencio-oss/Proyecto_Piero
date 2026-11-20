@@ -94,7 +94,7 @@ class ServicioAdminController extends BaseController
             return redirect()->back()->withInput()->with('error', implode(' ', $this->validator->getErrors()));
         }
 
-        $galeriaActual = $this->galeria($servicio['galeria_json'] ?? null);
+        $galeriaActual = galeria_servicio($servicio['galeria_json'] ?? null);
         $eliminar = $this->request->getPost('eliminar_imagenes');
         $eliminar = is_array($eliminar) ? array_unique(array_map('intval', $eliminar)) : [];
         $galeria = [];
@@ -159,7 +159,7 @@ class ServicioAdminController extends BaseController
             return redirect()->to(base_url('admin/servicios'))->with('error', 'No se pudo eliminar el servicio porque está asociado a otros registros.');
         }
 
-        $this->eliminarArchivos($this->galeria($servicio['galeria_json'] ?? null));
+        $this->eliminarArchivos(galeria_servicio($servicio['galeria_json'] ?? null));
 
         return redirect()->to(base_url('admin/servicios'))->with('mensaje', 'Servicio eliminado correctamente.');
     }
@@ -242,21 +242,6 @@ class ServicioAdminController extends BaseController
         }
 
         return $guardadas;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function galeria(mixed $json): array
-    {
-        if (! is_string($json) || $json === '') {
-            return [];
-        }
-        $imagenes = json_decode($json, true);
-
-        return is_array($imagenes)
-            ? array_values(array_filter($imagenes, static fn ($imagen): bool => is_string($imagen) && $imagen !== ''))
-            : [];
     }
 
     /**

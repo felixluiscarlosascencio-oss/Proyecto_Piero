@@ -100,7 +100,7 @@ class UsuarioAdminController extends BaseController
         if ($usuario === null) {
             return redirect()->to(base_url('admin/usuarios'))->with('error', 'No se encontró la cuenta.');
         }
-        if (in_array($usuario['rol'], ['Dueno', 'Admin'], true)) {
+        if ($usuario['rol'] === 'Dueno') {
             return redirect()->to(base_url('admin/usuarios'))->with('error', 'Las cuentas administrativas están protegidas.');
         }
 
@@ -137,7 +137,7 @@ class UsuarioAdminController extends BaseController
         if ($usuario === null || (int) ($usuario['creado_por'] ?? 0) !== (int) session()->get('id_usuario')) {
             return redirect()->to(base_url('admin/usuarios'))->with('error', 'Solo puedes eliminar las cuentas que tú creaste.');
         }
-        if (in_array($usuario['rol'], ['Dueno', 'Admin'], true)) {
+        if ($usuario['rol'] === 'Dueno') {
             return redirect()->to(base_url('admin/usuarios'))->with('error', 'Las cuentas administrativas están protegidas.');
         }
 

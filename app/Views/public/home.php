@@ -22,10 +22,7 @@
         <?php else: ?>
             <div class="tarjetas">
                 <?php foreach ($servicios as $servicio): ?>
-                    <?php
-                    $galeria = json_decode($servicio['galeria_json'] ?? '[]', true);
-                    $galeria = is_array($galeria) ? $galeria : [];
-                    ?>
+                    <?php $galeria = galeria_servicio($servicio['galeria_json'] ?? null); ?>
                     <article class="tarjeta servicio-card">
                         <h3><?= esc($servicio['nombre_item']) ?></h3>
                         <?php if (! empty($servicio['etiqueta_destacada'])): ?>
@@ -44,10 +41,7 @@
                 <?php endforeach; ?>
             </div>
             <?php foreach ($servicios as $servicio): ?>
-                <?php
-                $galeria = json_decode($servicio['galeria_json'] ?? '[]', true);
-                $galeria = is_array($galeria) ? $galeria : [];
-                ?>
+                <?php $galeria = galeria_servicio($servicio['galeria_json'] ?? null); ?>
                 <div class="modal fade servicio-modal" id="servicio-modal-<?= (int) $servicio['id'] ?>" tabindex="-1" aria-labelledby="servicio-modal-titulo-<?= (int) $servicio['id'] ?>" aria-hidden="true">
                     <div class="modal-dialog modal-dialog-centered modal-lg">
                         <div class="modal-content">
@@ -143,7 +137,7 @@
                 </div>
                 <input class="campo-oculto" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
                 <?php if ($recaptchaSiteKey !== ''): ?>
-                    <div class="g-recaptcha" data-sitekey="<?= esc(trim((string) env('RECAPTCHA_SITE_KEY'))) ?>"></div>
+                    <div class="g-recaptcha" data-sitekey="<?= esc($recaptchaSiteKey) ?>"></div>
                 <?php elseif ($recaptchaMisconfigured): ?>
                     <p class="captcha-aviso" role="status">El formulario está temporalmente no disponible. Inténtalo más tarde.</p>
                 <?php endif; ?>
@@ -169,14 +163,6 @@
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 <?php endif; ?>
 <script>
-    const cantidadAlumnos = document.getElementById('cantidad_estudiantes');
-    document.querySelectorAll('[data-step]').forEach((button) => {
-        button.addEventListener('click', () => {
-            const cantidad = Number(cantidadAlumnos.value) || 1;
-            cantidadAlumnos.value = Math.min(10000, Math.max(1, cantidad + Number(button.dataset.step)));
-        });
-    });
-
     document.getElementById('solicitud-cotizacion').addEventListener('submit', async (event) => {
         event.preventDefault();
         const form = event.currentTarget;

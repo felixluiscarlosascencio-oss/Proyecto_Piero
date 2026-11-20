@@ -63,6 +63,12 @@ Vagrantfile
 /writable/debugbar/*
 !/writable/debugbar/index.html
 
+# Base de datos local con datos reales: no versionar.
+/writable/database.db
+/writable/*.db
+/writable/*.sqlite
+/writable/*.sqlite3
+
 php_errors.log
 
 #-------------------------

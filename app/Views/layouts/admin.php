@@ -28,10 +28,10 @@ $esFormularioCotizacion = $rutaActual === 'admin/cotizaciones/nueva'
                     <a href="<?= base_url('admin/cotizaciones') ?>" <?= $rutaActual === 'admin/cotizaciones' ? 'aria-current="page"' : '' ?>><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5M10 13h6M10 17h6"/></svg>Cotizaciones</a>
                     <a href="<?= base_url('admin/cotizaciones/vigentes') ?>" <?= $rutaActual === 'admin/cotizaciones/vigentes' ? 'aria-current="page"' : '' ?>><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>Cotizaciones vigentes</a>
                 </div>
-                <?php if (in_array(session()->get('rol'), ['Dueno', 'Admin'], true) || \App\Libraries\AdminAccess::can('contratos.ver')): ?>
+                <?php if (\App\Libraries\AdminAccess::isAdmin() || \App\Libraries\AdminAccess::can('contratos.ver')): ?>
                     <div class="admin-nav-group">
                         <h2 class="admin-nav-heading">Operación</h2>
-                        <?php if (in_array(session()->get('rol'), ['Dueno', 'Admin'], true)): ?>
+                        <?php if (\App\Libraries\AdminAccess::isAdmin()): ?>
                             <a href="<?= base_url('admin/servicios') ?>" <?= str_starts_with($rutaActual, 'admin/servicios') ? 'aria-current="page"' : '' ?>><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16l-1 13H5L4 7zM9 7a3 3 0 0 1 6 0"/></svg>Servicios</a>
                             <a href="<?= base_url('admin/solicitudes') ?>" <?= str_starts_with($rutaActual, 'admin/solicitudes') ? 'aria-current="page"' : '' ?>><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v13H8l-4 3zM8 9h8M8 13h5"/></svg>Solicitudes del equipo</a>
                         <?php endif; ?>
@@ -40,7 +40,7 @@ $esFormularioCotizacion = $rutaActual === 'admin/cotizaciones/nueva'
                         <?php endif; ?>
                     </div>
                 <?php endif; ?>
-                <?php if (in_array(session()->get('rol'), ['Dueno', 'Admin'], true)): ?>
+                <?php if (\App\Libraries\AdminAccess::isAdmin()): ?>
                     <div class="admin-nav-group">
                         <h2 class="admin-nav-heading">Administración</h2>
                         <a href="<?= base_url('admin/usuarios') ?>" <?= str_starts_with($rutaActual, 'admin/usuarios') ? 'aria-current="page"' : '' ?>><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 8h4M19 6v4"/></svg>Usuarios</a>
@@ -79,7 +79,7 @@ $esFormularioCotizacion = $rutaActual === 'admin/cotizaciones/nueva'
                                     <span><?= esc($cargoAdmin) ?></span>
                                 </span>
                             </div>
-                            <?php if (in_array(session()->get('rol'), ['Dueno', 'Admin'], true)): ?>
+                            <?php if (\App\Libraries\AdminAccess::isAdmin()): ?>
                                 <a href="<?= base_url('admin/usuarios') ?>">
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 8h4M19 6v4"/></svg>
                                     Administrar usuarios

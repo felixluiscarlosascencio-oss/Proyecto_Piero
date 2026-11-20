@@ -11,8 +11,7 @@ $valor = static function (string $campo, mixed $predeterminado = '') use ($servi
 
     return (string) ($servicio[$campo] ?? $predeterminado);
 };
-$galeria = $servicio === null ? [] : json_decode($servicio['galeria_json'] ?? '[]', true);
-$galeria = is_array($galeria) ? $galeria : [];
+$galeria = $servicio === null ? [] : galeria_servicio($servicio['galeria_json'] ?? null);
 ?>
 <div class="modal show service-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="service-modal-title" style="display:block">
     <div class="modal-dialog modal-dialog-centered">

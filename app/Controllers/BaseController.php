@@ -23,6 +23,13 @@ use Psr\Log\LoggerInterface;
 abstract class BaseController extends Controller
 {
     /**
+     * Helpers disponibles en todos los controladores y sus vistas.
+     *
+     * @var list<string>
+     */
+    protected $helpers = ['servicio'];
+
+    /**
      * Be sure to declare properties for any property fetch you initialized.
      * The creation of dynamic property is deprecated in PHP 8.2.
      */
@@ -52,5 +59,15 @@ abstract class BaseController extends Controller
         $value = $this->request->getPost($field);
 
         return is_string($value) ? trim($value) : '';
+    }
+
+    /**
+     * Devuelve una página 403 sin provocar redirecciones circulares.
+     */
+    protected function sinPermiso(string $mensaje = 'No tienes permisos para acceder a esta sección.'): ResponseInterface
+    {
+        return $this->response
+            ->setStatusCode(403)
+            ->setBody(view('admin/sin-permiso', ['mensaje' => $mensaje]));
     }
 }

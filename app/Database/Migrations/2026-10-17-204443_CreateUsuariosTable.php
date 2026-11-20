@@ -42,7 +42,10 @@ class CreateUsuariosTable extends Migration
                 'type' => 'DATETIME',
                 'null' => true,
             ],
-            'creado_en DATETIME DEFAULT CURRENT_TIMESTAMP',
+            'creado_en' => [
+                'type' => 'DATETIME',
+                'null' => true,
+            ],
         ]);
 
         $this->forge->addKey('id', true);

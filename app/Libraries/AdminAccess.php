@@ -13,7 +13,7 @@ class AdminAccess
 
     public static function isAdmin(): bool
     {
-        return in_array(session()->get('rol'), ['Dueno', 'Admin'], true);
+        return session()->get('rol') === 'Dueno';
     }
 
     public static function can(string $permission): bool
@@ -27,7 +27,9 @@ class AdminAccess
             $permissions = json_decode($permissions, true);
         }
 
-        if (is_array($permissions)) {
+        // Un array vacío significa "sin permisos específicos": se usan los
+        // permisos predeterminados del rol para no dejar cuentas bloqueadas.
+        if (is_array($permissions) && $permissions !== []) {
             return in_array($permission, $permissions, true);
         }
 

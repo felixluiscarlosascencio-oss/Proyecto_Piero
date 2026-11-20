@@ -2,8 +2,9 @@
 
 namespace App\Controllers;
 
+use App\Libraries\CatalogoServicios;
+use App\Libraries\DocumentoCodigo;
 use App\Models\CotizacionModel;
-use App\Models\ServicioModel;
 use Throwable;
 
 class SolicitudCotizacionController extends BaseController
@@ -65,7 +66,7 @@ class SolicitudCotizacionController extends BaseController
             }
         }
 
-        $servicios = $this->serviciosSeleccionados($this->request->getPost('servicios'));
+        $servicios = (new CatalogoServicios())->paraSolicitud($this->request->getPost('servicios'));
         if ($servicios === []) {
             return $this->jsonError(422, 'Selecciona al menos un servicio disponible.');
         }
@@ -83,33 +84,54 @@ class SolicitudCotizacionController extends BaseController
         }
 
         $model = new CotizacionModel();
+        $db = db_connect();
+        $db->transBegin();
         try {
+            $codigoSolicitud = DocumentoCodigo::siguiente(DocumentoCodigo::SOL);
             $id = $model->insert([
                 'nombre_colegio'       => $datos['nombre_colegio'],
                 'nombre_seccion'       => null,
                 'persona_encargada'    => $datos['persona_encargada'],
                 'telefono_contacto'    => $datos['telefono_contacto'],
+                'distrito'             => $datos['distrito'],
+                'provincia'            => $datos['provincia'],
+                'nivel'                => $datos['nivel'],
+                'tipo_servicio'        => $datos['tipo_servicio'],
+                'observaciones'        => $datos['observaciones'] !== '' ? $datos['observaciones'] : null,
                 'cantidad_estudiantes' => $cantidad,
                 'servicios_json'       => json_encode($servicios, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
-                'precio_unitario'      => $precioUnitario,
-                'total_seccion'        => $total,
-                'estado'               => CotizacionModel::ESTADO_SOLICITUD,
+                'precio_unitario'      => 0,
+                'total_seccion'        => 0,
+                'estado'               => CotizacionModel::ESTADO_BORRADOR,
+                'estado_revision'      => CotizacionModel::REVISION_SIN_REVISAR,
+                'codigo_solicitud'     => $codigoSolicitud,
+                'version'              => 1,
             ]);
+            if (! $id) {
+                throw new \RuntimeException('The public request did not return an id.');
+            }
+            $db->table('eventos_comerciales')->insert([
+                'cotizacion_id' => (int) $id,
+                'contrato_id'   => null,
+                'tipo'          => 'solicitud_recibida',
+                'detalle'       => json_encode(['codigo' => $codigoSolicitud], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+                'usuario_id'    => null,
+                'creado_en'     => date('Y-m-d H:i:s'),
+            ]);
+            if ($db->transStatus() === false) {
+                throw new \RuntimeException('The public request transaction failed.');
+            }
+            $db->transCommit();
         } catch (Throwable $exception) {
+            $db->transRollback();
             log_message('error', 'Failed to persist a public quote request: ' . $exception->getMessage());
-
-            return $this->jsonError(500, 'No se pudo guardar la solicitud. Inténtalo nuevamente.');
-        }
-
-        if (! $id) {
-            log_message('error', 'Failed to save a public quote request: ' . json_encode($model->errors()));
 
             return $this->jsonError(500, 'No se pudo guardar la solicitud. Inténtalo nuevamente.');
         }
 
         $mensaje = implode("\n", [
             'Hola, deseo solicitar una cotización de Piero Producciones.',
-            'Solicitud #' . $id,
+            'Solicitud ' . $codigoSolicitud,
             'Institución: ' . $datos['nombre_colegio'],
             'Distrito: ' . $datos['distrito'],
             'Provincia: ' . $datos['provincia'],
@@ -145,52 +167,6 @@ class SolicitudCotizacionController extends BaseController
         return $this->response->setStatusCode($status)->setJSON($body);
     }
 
-    /**
-     * @return list<array{servicio_id: int, nombre: string, descripcion: string, precio_interno: float, precio_unitario: int}>
-     */
-    private function serviciosSeleccionados(mixed $input): array
-    {
-        if (! is_array($input)) {
-            return [];
-        }
-
-        $ids = [];
-        foreach ($input as $value) {
-            $id = filter_var($value, FILTER_VALIDATE_INT);
-            if ($id === false || $id < 1) {
-                return [];
-            }
-            $ids[] = $id;
-        }
-
-        $ids = array_values(array_unique($ids));
-        if ($ids === []) {
-            return [];
-        }
-
-        $catalogo = (new ServicioModel())
-            ->select('id, nombre_item, descripcion, precio_interno')
-            ->whereIn('id', $ids)
-            ->findAll();
-
-        if (count($catalogo) !== count($ids)) {
-            return [];
-        }
-
-        $servicios = [];
-        foreach ($catalogo as $servicio) {
-            $servicios[] = [
-                'servicio_id'     => (int) $servicio['id'],
-                'nombre'          => (string) $servicio['nombre_item'],
-                'descripcion'     => (string) ($servicio['descripcion'] ?? ''),
-                'precio_interno'  => (float) $servicio['precio_interno'],
-                'precio_unitario' => 0,
-            ];
-        }
-
-        return $servicios;
-    }
-
     private function contienePalabraProhibida(string $texto): bool
     {
         $normalizado = mb_strtolower($texto, 'UTF-8');
@@ -211,10 +187,6 @@ class SolicitudCotizacionController extends BaseController
     {
         $siteKey = trim((string) env('RECAPTCHA_SITE_KEY'));
         $secret = trim((string) env('RECAPTCHA_SECRET_KEY'));
-
-        if ($siteKey === '' && $secret === '') {
-            return null;
-        }
 
         if ($siteKey === '' || $secret === '') {
             log_message('error', 'Google reCAPTCHA is not configured: RECAPTCHA_SITE_KEY and RECAPTCHA_SECRET_KEY are required.');

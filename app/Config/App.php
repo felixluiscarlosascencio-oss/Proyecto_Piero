@@ -19,6 +19,22 @@ class App extends BaseConfig
     public string $baseURL = 'http://localhost:8080/';
 
     /**
+     * --------------------------------------------------------------------------
+     * Auto-detect Base Site URL
+     * --------------------------------------------------------------------------
+     *
+     * When true, on web requests the baseURL is rebuilt from the incoming
+     * request (Host header + scheme), so the application works unchanged
+     * behind a domain, a reverse proxy or a temporary tunnel (e.g.
+     * cloudflared). The scheme honors X-Forwarded-Proto / CF-Visitor so
+     * https tunnels do not generate http:// links.
+     *
+     * Set to false (or app.autoDetectBaseURL = false in .env) to always use
+     * the configured $baseURL, for example on a fixed production domain.
+     */
+    public bool $autoDetectBaseURL = true;
+
+    /**
      * Allowed Hostnames in the Site URL other than the hostname in the baseURL.
      * If you want to accept multiple Hostnames, set this.
      *
@@ -199,4 +215,123 @@ class App extends BaseConfig
      * @see http://www.w3.org/TR/CSP/
      */
     public bool $CSPEnabled = false;
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        if ($this->autoDetectBaseURL) {
+            $detected = $this->detectBaseURL();
+
+            if ($detected !== null) {
+                $this->baseURL = $detected;
+            }
+        }
+    }
+
+    /**
+     * Builds the base URL from the current request.
+     * Returns null for CLI requests or invalid hosts, keeping $baseURL.
+     */
+    protected function detectBaseURL(): ?string
+    {
+        if (PHP_SAPI === 'cli' || ! isset($_SERVER['HTTP_HOST'])) {
+            return null;
+        }
+
+        $host = strtolower(trim((string) $_SERVER['HTTP_HOST']));
+
+        // Only hostnames, IPv4/IPv6 and an optional port are accepted.
+        if (preg_match('/^(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|\[[0-9a-f:.]+\])\.?(?::\d{1,5})?$/i', $host) !== 1) {
+            return null;
+        }
+
+        // The Host header is controlled by the client. Only trust it when the
+        // hostname is explicitly allowed or when we are running locally.
+        if (! $this->isTrustedHost($host)) {
+            return null;
+        }
+
+        return $this->detectScheme() . '://' . $host . $this->detectBasePath();
+    }
+
+    /**
+     * Comprueba que el host de la petición esté permitido.
+     */
+    protected function isTrustedHost(string $host): bool
+    {
+        $hostname = strtolower(preg_replace('/:\d{1,5}$/', '', $host) ?? $host);
+        $hostname = trim($hostname, '[]');
+
+        if (in_array($hostname, ['localhost', '127.0.0.1', '::1'], true)) {
+            return true;
+        }
+
+        foreach ($this->allowedHostnames as $allowed) {
+            if (strtolower(trim((string) $allowed)) === $hostname) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Detects the request scheme, including reverse proxy / tunnel headers.
+     */
+    protected function detectScheme(): string
+    {
+        $forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
+
+        if ($forwardedProto !== '') {
+            // May contain a list: "https,http".
+            $proto = strtolower(trim(explode(',', (string) $forwardedProto)[0]));
+
+            if (in_array($proto, ['http', 'https'], true)) {
+                return $proto;
+            }
+        }
+
+        // Cloudflare sends {"scheme":"https"}.
+        $cfVisitor = $_SERVER['HTTP_CF_VISITOR'] ?? '';
+
+        if ($cfVisitor !== '') {
+            $visitor = json_decode((string) $cfVisitor, true);
+
+            if (is_array($visitor) && in_array($visitor['scheme'] ?? '', ['http', 'https'], true)) {
+                return $visitor['scheme'];
+            }
+        }
+
+        if (! empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') {
+            return 'https';
+        }
+
+        if ((int) ($_SERVER['SERVER_PORT'] ?? 0) === 443) {
+            return 'https';
+        }
+
+        return 'http';
+    }
+
+    /**
+     * Returns the sub-directory path where the front controller lives,
+     * with leading and trailing slashes ("/" when served from the root).
+     */
+    protected function detectBasePath(): string
+    {
+        $scriptName = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+
+        if (! str_ends_with($scriptName, '.php')) {
+            return '/';
+        }
+
+        $directory = str_replace('\\', '/', dirname($scriptName));
+
+        if ($directory === '.' || $directory === '' || $directory === '/') {
+            return '/';
+        }
+
+        return '/' . trim($directory, '/') . '/';
+    }
 }

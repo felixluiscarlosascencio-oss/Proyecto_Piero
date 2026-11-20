@@ -1,11 +1,12 @@
 <?= $this->extend('layouts/admin') ?>
-<?= $this->section('titulo') ?>Contrato <?= esc($contrato['numero_contrato'] ?: '#' . $contrato['id']) ?><?= $this->endSection() ?>
+<?php $codigoContrato = (string) ($contrato['codigo'] ?: ($contrato['numero_contrato'] ?: '#' . $contrato['id'])); ?>
+<?= $this->section('titulo') ?>Contrato <?= esc($codigoContrato) ?><?= $this->endSection() ?>
 <?= $this->section('contenido') ?>
 <?php $puedeCrearAjustes = \App\Libraries\AdminAccess::can('contratos.editar'); ?>
 <div class="page-heading contract-heading">
     <div>
         <a class="back-link" href="<?= base_url('admin/contratos') ?>">&larr; Volver a contratos</a>
-        <h1>Contrato <?= esc($contrato['numero_contrato'] ?: '#' . $contrato['id']) ?></h1>
+        <h1>Contrato <?= esc($codigoContrato) ?></h1>
         <p>Estado: <?= esc($contrato['estado_contrato'] ?? 'Activo') ?> · Documento original inmutable</p>
     </div>
     <a class="button primary" href="<?= base_url('admin/contratos/' . $contrato['id'] . '/pdf') ?>">Descargar contrato PDF</a>
@@ -30,8 +31,10 @@
         <div><dt>Persona encargada</dt><dd><?= esc($contrato['persona_encargada'] ?? 'Sin especificar') ?></dd></div>
         <div><dt>Teléfono / WhatsApp</dt><dd><?= esc($contrato['telefono_contacto'] ?? 'Sin especificar') ?></dd></div>
         <div><dt>Nivel / aula</dt><dd><?= esc(trim(($contrato['nivel'] ?? '') . ' ' . ($contrato['aula'] ?? '')) ?: 'Sin especificar') ?></dd></div>
+        <div><dt>Código</dt><dd><?= esc($codigoContrato) ?></dd></div>
         <div><dt>Alumnos iniciales</dt><dd><?= esc($contrato['cant_alumnos_inicial'] ?? 0) ?></dd></div>
         <div><dt>Monto original</dt><dd>S/ <?= number_format((float) ($contrato['monto_total'] ?? 0), 2) ?></dd></div>
+        <div><dt>Monto vigente</dt><dd><strong>S/ <?= number_format((float) ($montoVigente ?? $contrato['monto_total'] ?? 0), 2) ?></strong></dd></div>
         <div><dt>Saldo original</dt><dd>S/ <?= number_format((float) ($contrato['monto_saldo'] ?? 0), 2) ?></dd></div>
     </dl>
     <?php if (! empty($contrato['observaciones'])): ?><p><strong>Observaciones:</strong> <?= nl2br(esc($contrato['observaciones'])) ?></p><?php endif; ?>
@@ -56,11 +59,12 @@
     <?php else: ?>
         <div class="table-wrap">
             <table class="data-table">
-                <thead><tr><th>Fecha</th><th>Tipo</th><th>Motivo</th><th>Detalle</th><th>Impacto financiero</th></tr></thead>
+                <thead><tr><th>Código</th><th>Fecha</th><th>Tipo</th><th>Motivo</th><th>Detalle</th><th>Impacto financiero</th></tr></thead>
                 <tbody>
                     <?php foreach ($ajustes as $ajuste): ?>
                         <?php $detalle = json_decode((string) $ajuste['detalle_json'], true); ?>
                         <tr>
+                            <td><strong><?= esc($ajuste['codigo'] ?: 'ADE-' . $ajuste['id']) ?></strong></td>
                             <td><?= esc($ajuste['creado_en'] ? date('d/m/Y H:i', strtotime($ajuste['creado_en'])) : 'Sin fecha') ?></td>
                             <td><?= esc(ucfirst($ajuste['tipo'])) ?></td>
                             <td><?= esc($ajuste['motivo']) ?></td>

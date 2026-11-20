@@ -5,6 +5,7 @@ namespace App\Filters;
 use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\AdminAccess;
 
 class AuthFilter implements FilterInterface
 {
@@ -14,7 +15,7 @@ class AuthFilter implements FilterInterface
             return redirect()->to(base_url('login'))->with('error', 'Inicia sesión para acceder al panel.');
         }
 
-        if (in_array('admin', $arguments ?? [], true) && ! in_array(session()->get('rol'), ['Dueno', 'Admin'], true)) {
+        if (in_array('admin', $arguments ?? [], true) && ! AdminAccess::isAdmin()) {
             return redirect()->to(base_url('admin/cotizaciones'))->with('error', 'No tienes permisos para realizar esta acción.');
         }
 
